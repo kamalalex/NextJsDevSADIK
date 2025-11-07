@@ -1,0 +1,139 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  name          String
+  avatar        String?
+  cin           String
+  role          UserRole
+  companyId     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  company       Company? @relation(fields: [companyId], references: [id])
+  demands       Demand[]
+  invoices      Invoice[]
+  
+  @@map("users")
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  type        CompanyType
+  address     String?
+  phone       String?
+  ice         String
+  email       String
+  contact     String
+  logo        String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  users       User[]
+  vehicles    Vehicle[]
+  drivers     Driver[]
+  demands     Demand[]
+  invoices    Invoice[]
+  
+  @@map("companies")
+}
+
+model Vehicle {
+  id          String   @id @default(cuid())
+  plateNumber String
+  marque      String
+  model       String
+  capacity    String
+  type        String
+  status      VehicleStatus @default(ACTIVE)
+  companyId   String
+  driverId    String?
+  
+  company     Company @relation(fields: [companyId], references: [id])
+  driver      Driver?  @relation(fields: [driverId], references: [id])
+  
+  @@map("vehicles")
+}
+
+model Driver {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  picture     String
+  phone       String
+  cin         String
+  driveCard   String
+  status      DriverStatus @default(ACTIVE)
+  companyId   String?
+  isIndependent Boolean @default(false)
+  
+  company     Company? @relation(fields: [companyId], references: [id])
+  vehicles    Vehicle[]
+  
+  @@map("drivers")
+}
+
+model Demand {
+  id       String   @id @default(cuid())
+  title    String
+  userId   String
+  companyId String
+
+  user     User     @relation(fields: [userId], references: [id])
+  company  Company  @relation(fields: [companyId], references: [id])
+
+  @@map("demands")
+}
+
+model Invoice {
+  id       String   @id @default(cuid())
+  amount   Float
+  userId   String
+  companyId String
+
+  user     User     @relation(fields: [userId], references: [id])
+  company  Company  @relation(fields: [companyId], references: [id])
+
+  @@map("invoices")
+}
+enum UserRole {
+  SUPER_ADMIN
+  SUPER_ASSISTANT
+  SUPER_COMMERCIAL
+  SUPER_FINANCE
+  COMPANY_ADMIN
+  COMPANY_OPERATOR
+  CLIENT_ADMIN
+  CLIENT_LOGISTICS
+  INDEPENDENT_DRIVER
+}
+
+enum CompanyType {
+  TRANSPORT_COMPANY
+  CLIENT_COMPANY
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+  ON_MISSION
+}

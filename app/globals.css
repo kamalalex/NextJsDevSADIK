@@ -1,2 +1,12 @@
 @import "tailwindcss";
 
+/* Animation pour les points ETA */
+@keyframes pulse-red-green {
+  0% { background-color: #ffffff; }
+  100% { backgroundColor: #220af7fa; }
+  50% { background-color: #ffffff; }
+}
+
+.animate-pulse-eta {
+  animation: pulse-red-green 1s infinite alternate;
+}

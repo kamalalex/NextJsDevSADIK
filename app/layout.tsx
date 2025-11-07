@@ -1,24 +1,26 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import './globals.css';
 
-
-
-export const metadata: Metadata = {
-  title: "SADIC NEXTJS",
-  description: "Let's Do It",
- 
+export const metadata = {
+  title: 'Transport SaaS',
+  description: 'Plateforme de gestion de transport',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="fr">
+      <head>
+        <link 
+          rel="stylesheet" 
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
+        />
+      </head>
+      <body className="bg-gray-50 dark:bg-gray-900">
         {children}
       </body>
     </html>
-  );
+  )
 }
