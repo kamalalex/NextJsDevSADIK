@@ -3,10 +3,25 @@
 /* Animation pour les points ETA */
 @keyframes pulse-red-green {
   0% { background-color: #ffffff; }
-  100% { backgroundColor: #220af7fa; }
+  100% { background-color: #220af7fa; }
   50% { background-color: #ffffff; }
 }
 
 .animate-pulse-eta {
   animation: pulse-red-green 1s infinite alternate;
+}
+
+/* Styles de base */
+body {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Dark mode support */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Transition par défaut */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
 }

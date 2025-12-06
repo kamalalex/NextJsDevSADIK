@@ -1,114 +1,268 @@
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
-
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  password      String
-  name          String
-  avatar        String?
-  cin           String
-  role          UserRole
-  companyId     String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  company       Company? @relation(fields: [companyId], references: [id])
-  demands       Demand[]
-  invoices      Invoice[]
-  
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  email           String    @unique
+  password        String
+  name            String
+  avatar          String?
+  role            UserRole
+  phone           String?
+  isActive        Boolean   @default(true)
+  companyId       String?   @db.ObjectId
+  company         Company?  @relation(fields: [companyId], references: [id])
+  createdOperations Operation[] @relation("CreatedOperations")
+  uploadedDocuments Document[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  driver          Driver?
   @@map("users")
 }
 
 model Company {
-  id          String   @id @default(cuid())
-  name        String
-  type        CompanyType
-  address     String?
-  phone       String?
-  ice         String
-  email       String
-  contact     String
-  logo        String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  
-  users       User[]
-  vehicles    Vehicle[]
-  drivers     Driver[]
-  demands     Demand[]
-  invoices    Invoice[]
-  
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  name            String    @unique
+  type            CompanyType
+  address         String?
+  phone           String?
+  email           String?
+  logo            String?
+  ice             String?
+  contactPerson   String?
+  isActive        Boolean   @default(true)
+  trialEndsAt     DateTime?
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  maxUsers        Int       @default(5)
+  users           User[]
+  vehicles        Vehicle[]
+  drivers         Driver[]
+  clientOperations Operation[] @relation("ClientOperations")
+  transportOperations Operation[] @relation("TransportOperations")
+  clientInvoices  Invoice[] @relation("ClientInvoices")
+  transportInvoices Invoice[] @relation("TransportInvoices")
+  subcontractorPayments SubcontractorPayment[] @relation("SubcontractorPayments")
+  subcontractors  Subcontractor[]
+  createdAt       DateTime  @default(now())
   @@map("companies")
 }
 
+model Operation {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  reference           String    @unique
+  operationDate       DateTime
+  status              OperationStatus @default(PENDING)
+  priority            Priority  @default(MEDIUM)
+  loadingPoints       Json[]
+  unloadingPoints     Json[]
+  vehicleType         VehicleType
+  ptac                PtacType
+  totalWeight         Float
+  packaging           PackagingType?
+  quantity            Int?
+  licensePlate        String?
+  salePrice           Float?
+  purchasePrice       Float?
+  subcontractedByCompany Boolean @default(false)
+  subcontractedBySubcontractor Boolean @default(false)
+  subcontractorId     String?   @db.ObjectId
+  subcontractor       Subcontractor? @relation(fields: [subcontractorId], references: [id])
+  paymentStatus       PaymentStatus @default(PENDING)
+  invoiceId           String?   @db.ObjectId
+  invoice             Invoice?  @relation(fields: [invoiceId], references: [id])
+  subcontractorPaid   Boolean   @default(false)
+  subcontractorPaidAt DateTime?
+  subcontractorPaymentId String? @db.ObjectId
+  subcontractorPayment SubcontractorPayment? @relation(fields: [subcontractorPaymentId], references: [id])
+  createdById         String    @db.ObjectId
+  createdBy           User      @relation("CreatedOperations", fields: [createdById], references: [id])
+  assignedDriverId    String?   @db.ObjectId
+  assignedDriver      Driver?   @relation(fields: [assignedDriverId], references: [id])
+  assignedVehicleId   String?   @db.ObjectId  
+  assignedVehicle     Vehicle?  @relation(fields: [assignedVehicleId], references: [id])
+  clientId            String?   @db.ObjectId
+  client              Company?  @relation("ClientOperations", fields: [clientId], references: [id])
+  transportCompanyId  String?   @db.ObjectId
+  transportCompany    Company?  @relation("TransportOperations", fields: [transportCompanyId], references: [id])
+  trackingUpdates     TrackingUpdate[]
+  documents           Document[]
+  assignedDrivers     DriverAssignment[]
+  currentLocation     Json?
+  sealNumber          String?
+  observations        String?
+  cancellationReason  String?
+  estimatedDuration   Int?
+  distance            Float?
+  actualDuration      Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  confirmedAt         DateTime?
+  startedAt           DateTime?
+  deliveredAt         DateTime?
+  @@map("operations")
+  @@index([status])
+  @@index([clientId, transportCompanyId])
+  @@index([operationDate])
+}
+
+model DriverAssignment {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  operationId   String   @db.ObjectId
+  operation     Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  driverId      String   @db.ObjectId
+  driver        Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  assignedPrice Float
+  vehiclePlate  String?
+  status        DriverAssignmentStatus @default(EN_ATTENTE)
+  createdAt DateTime @default(now())
+  @@unique([operationId, driverId])
+  @@map("driver_assignments")
+}
+
+model TrackingUpdate {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  operationId String   @db.ObjectId
+  operation   Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  status      OperationStatus
+  location    Json?
+  note        String?
+  photos      String[]
+  recordedBy  String
+  createdAt DateTime @default(now())
+  @@map("tracking_updates")
+}
+
+model Document {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  operationId String   @db.ObjectId
+  operation   Operation @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  type        DocumentType
+  url         String
+  filename    String
+  uploadedById String   @db.ObjectId
+  uploadedBy  User     @relation(fields: [uploadedById], references: [id])
+  createdAt DateTime @default(now())
+  @@map("documents")
+}
+
 model Vehicle {
-  id          String   @id @default(cuid())
-  plateNumber String
-  marque      String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  plateNumber String   @unique
   model       String
   capacity    String
-  type        String
+  vehicleType VehicleType
   status      VehicleStatus @default(ACTIVE)
-  companyId   String
-  driverId    String?
-  
-  company     Company @relation(fields: [companyId], references: [id])
+  brand                   String?
+  firstCirculationDate    DateTime?
+  technicalInspectionDate DateTime?
+  insuranceDate           DateTime?
+  dimensions              String?
+  documents               String[]
+  ptac                    PtacType?
+  companyId       String?        @db.ObjectId
+  company         Company?       @relation(fields: [companyId], references: [id])
+  subcontractorId String?        @db.ObjectId
+  subcontractor   Subcontractor? @relation(fields: [subcontractorId], references: [id])
+  driverId    String?  @db.ObjectId
   driver      Driver?  @relation(fields: [driverId], references: [id])
-  
+  operations  Operation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@map("vehicles")
 }
 
 model Driver {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
-  email       String
-  picture     String
+  email       String?
   phone       String
-  cin         String
-  driveCard   String
+  license     String
   status      DriverStatus @default(ACTIVE)
-  companyId   String?
+  cin         String?
+  licenseDate DateTime?
+  documents   String[]
+  companyId       String?        @db.ObjectId
+  company         Company?       @relation(fields: [companyId], references: [id])
+  subcontractorId String?        @db.ObjectId
+  subcontractor   Subcontractor? @relation(fields: [subcontractorId], references: [id])
   isIndependent Boolean @default(false)
-  
-  company     Company? @relation(fields: [companyId], references: [id])
+  professionalCard String?
+  userId          String?   @unique @db.ObjectId
+  user            User?     @relation(fields: [userId], references: [id])
+  assignments DriverAssignment[]
   vehicles    Vehicle[]
-  
+  operations  Operation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@map("drivers")
 }
 
-model Demand {
-  id       String   @id @default(cuid())
-  title    String
-  userId   String
-  companyId String
-
-  user     User     @relation(fields: [userId], references: [id])
-  company  Company  @relation(fields: [companyId], references: [id])
-
-  @@map("demands")
+model Subcontractor {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  companyName String
+  phone       String
+  email       String?
+  address     String?
+  companyId   String?
+  paymentWithInvoice Boolean @default(true)
+  vehicles    Vehicle[]
+  operations  Operation[]
+  drivers     Driver[]
+  payments    SubcontractorPayment[]
+  transportCompanyId String   @db.ObjectId
+  transportCompany   Company  @relation(fields: [transportCompanyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("subcontractors")
 }
 
 model Invoice {
-  id       String   @id @default(cuid())
-  amount   Float
-  userId   String
-  companyId String
-
-  user     User     @relation(fields: [userId], references: [id])
-  company  Company  @relation(fields: [companyId], references: [id])
-
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  number      String   @unique
+  date        DateTime
+  amount      Float
+  taxAmount   Float    @default(0)
+  totalAmount Float
+  taxRate     Float    @default(20)
+  status      InvoiceStatus @default(EN_ATTENTE)
+  dueDate     DateTime
+  paidAt      DateTime?
+  documentUrl String?
+  operations  Operation[]
+  clientId    String   @db.ObjectId
+  client      Company  @relation("ClientInvoices", fields: [clientId], references: [id])
+  transportCompanyId String   @db.ObjectId
+  transportCompany   Company  @relation("TransportInvoices", fields: [transportCompanyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@map("invoices")
 }
+
+model SubcontractorPayment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  paymentNumber String @unique
+  paymentDate DateTime
+  totalAmount Float
+  status      PaymentStatus @default(PENDING)
+  documentUrl String?
+  notes       String?
+  subcontractorId String        @db.ObjectId
+  subcontractor   Subcontractor @relation(fields: [subcontractorId], references: [id])
+  transportCompanyId String   @db.ObjectId
+  transportCompany   Company  @relation("SubcontractorPayments", fields: [transportCompanyId], references: [id])
+  operations Operation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("subcontractor_payments")
+}
+
 enum UserRole {
   SUPER_ADMIN
   SUPER_ASSISTANT
@@ -126,6 +280,77 @@ enum CompanyType {
   CLIENT_COMPANY
 }
 
+enum OperationStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  DELIVERED
+  CANCELLED
+}
+
+enum VehicleType {
+  RIDEL
+  FOURGON
+  BACHE
+  PLATEAU
+  PORTE_CONTENEUR
+  BENNE
+  FRIGO
+  AUTRE
+}
+
+enum PtacType {
+  PTAC_3_5T
+  PTAC_7T
+  PTAC_14T
+  PTAC_25T
+}
+
+enum PackagingType {
+  PALLET
+  PARCEL
+  BULK
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+  PARTIALLY_PAID
+}
+
+enum Priority {
+  LOW
+  MEDIUM 
+  HIGH
+  URGENT
+}
+
+enum DriverAssignmentStatus {
+  EN_ATTENTE
+  CONFIRME
+  EN_COURS
+  TERMINE
+  ANNULE
+}
+
+enum DocumentType {
+  BON_LIVRAISON
+  BON_COMMANDE
+  PHOTO_CHARGEMENT
+  PHOTO_DECHARGEMENT
+  FACTURE
+  SCELES
+  TRACKING_PDF
+  CARTE_GRISE
+  ASSURANCE
+  VISITE_TECHNIQUE
+  PERMIS_CONDUIRE
+  CIN
+  AUTRE
+}
+
 enum VehicleStatus {
   ACTIVE
   INACTIVE
@@ -136,4 +361,17 @@ enum DriverStatus {
   ACTIVE
   INACTIVE
   ON_MISSION
+}
+
+enum InvoiceStatus {
+  EN_ATTENTE
+  PAYEE
+  ANNULEE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  EXPIRED
 }

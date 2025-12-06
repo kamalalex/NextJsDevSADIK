@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET ;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Routes protégées par rôle
 const roleRoutes = {
@@ -11,17 +12,25 @@ const roleRoutes = {
   '/driver': ['INDEPENDENT_DRIVER'],
 };
 
-// Export par défaut
-export default function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get('auth-token')?.value;
   const { pathname } = request.nextUrl;
 
+  console.log('🛡️ Proxy intercepte:', request.method, pathname);
+
+  // ⚠️ CORRECTION : Laisser passer toutes les requêtes API
+  if (pathname.startsWith('/api/')) {
+    console.log('✅ Laisser passer API:', pathname);
+    return NextResponse.next();
+  }
+
   // Routes publiques - permettre l'accès
-  if (pathname === '/login' || pathname === '/') {
+  if (pathname === '/login' || pathname === '/' || pathname.startsWith('/register')) {
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET) as any;
         const redirectUrl = getDashboardUrl(decoded.role);
+        console.log('🔀 Redirection vers dashboard:', redirectUrl, 'pour rôle:', decoded.role);
         return NextResponse.redirect(new URL(redirectUrl, request.url));
       } catch (error) {
         // Token invalide, supprimer le cookie et rester sur la page
@@ -35,6 +44,7 @@ export default function proxy(request: NextRequest) {
 
   // Vérifier l'authentification pour les routes protégées
   if (!token) {
+    console.log('🔐 Non authentifié, redirection vers login');
     const loginUrl = new URL('/login', request.url);
     if (pathname !== '/') {
       loginUrl.searchParams.set('callbackUrl', pathname);
@@ -44,34 +54,23 @@ export default function proxy(request: NextRequest) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
+    console.log('👤 Utilisateur authentifié:', decoded.role, decoded.email);
 
     // Vérifier les permissions basées sur le rôle
     for (const [route, allowedRoles] of Object.entries(roleRoutes)) {
       if (pathname.startsWith(route)) {
         if (!allowedRoles.includes(decoded.role)) {
+          console.log('🚫 Accès refusé pour le rôle:', decoded.role, 'sur la route:', route);
           return NextResponse.redirect(new URL('/unauthorized', request.url));
         }
         break;
       }
     }
 
-    // Ajouter les informations utilisateur aux headers pour les API routes
-    if (pathname.startsWith('/api/')) {
-      const requestHeaders = new Headers(request.headers);
-      requestHeaders.set('x-user-id', decoded.userId);
-      requestHeaders.set('x-user-role', decoded.role);
-      requestHeaders.set('x-company-id', decoded.companyId || '');
-
-      return NextResponse.next({
-        request: {
-          headers: requestHeaders,
-        },
-      });
-    }
-
+    console.log('✅ Accès autorisé pour:', decoded.role, 'sur:', pathname);
     return NextResponse.next();
   } catch (error) {
-    console.error('Token verification failed:', error);
+    console.error('❌ Token verification failed:', error);
     const response = NextResponse.redirect(new URL('/login', request.url));
     response.cookies.delete('auth-token');
     return response;
@@ -79,6 +78,8 @@ export default function proxy(request: NextRequest) {
 }
 
 function getDashboardUrl(role: string): string {
+  console.log('🎯 Détermination dashboard pour rôle:', role);
+
   switch (role) {
     case 'SUPER_ADMIN':
     case 'SUPER_ASSISTANT':
@@ -94,7 +95,8 @@ function getDashboardUrl(role: string): string {
     case 'INDEPENDENT_DRIVER':
       return '/driver/dashboard';
     default:
-      return '/dashboard';
+      console.warn('⚠️ Rôle inconnu, redirection vers admin par défaut');
+      return '/admin/dashboard';
   }
 }
 

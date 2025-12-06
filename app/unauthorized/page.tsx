@@ -9,10 +9,10 @@ export default function UnauthorizedPage() {
           Vous n'avez pas les permissions nécessaires pour accéder à cette page.
         </p>
         <a
-          href="/dashboard"
+          href="/login"
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-300"
         >
-          Retour au tableau de bord
+          Retour à la connexion
         </a>
       </div>
     </div>
