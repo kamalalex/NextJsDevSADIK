@@ -23,11 +23,16 @@ export async function PUT(
         // Vérifier que l'opération appartient bien à la compagnie
         const operation = await prisma.operation.findUnique({
             where: { id },
-            select: { transportCompanyId: true }
+            select: { transportCompanyId: true, createdById: true }
         });
 
         if (!operation || operation.transportCompanyId !== user.companyId) {
             return NextResponse.json({ error: 'Operation not found or unauthorized' }, { status: 404 });
+        }
+
+        // Restrict COMPANY_OPERATOR check
+        if (user.role === 'COMPANY_OPERATOR' && operation.createdById !== user.userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
         const updateData: any = { status };

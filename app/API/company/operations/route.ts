@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
             transportCompanyId: user.companyId
         };
 
+        // Restrict COMPANY_OPERATOR to only see their own operations
+        if (user.role === 'COMPANY_OPERATOR') {
+            whereClause.createdById = user.userId;
+        }
+
         if (status) {
             whereClause.status = status as OperationStatus;
         }
@@ -53,6 +58,9 @@ export async function GET(request: NextRequest) {
                 },
                 subcontractor: {
                     select: { companyName: true }
+                },
+                createdBy: {
+                    select: { name: true, role: true }
                 }
             },
             orderBy: {

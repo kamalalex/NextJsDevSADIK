@@ -10,6 +10,8 @@ import InvoiceList from '../../../components/company/InvoiceList';
 import InvoiceGenerator from '../../../components/company/InvoiceGenerator';
 import SubcontractorPayments from '../../../components/company/SubcontractorPayments';
 import FinancialDashboard from '../../../components/company/FinancialDashboard';
+import CompanyProfile from '../../../components/company/CompanyProfile';
+import TeamList from '../../../components/company/TeamList';
 
 interface CompanyStats {
   totalOperations: number;
@@ -20,9 +22,17 @@ interface CompanyStats {
   totalRevenue: number;
 }
 
-type MainTab = 'overview' | 'planning' | 'finance' | 'resources';
+interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  role: string;
+}
+
+type MainTab = 'overview' | 'planning' | 'finance' | 'resources' | 'profile';
 type FinanceTab = 'invoices' | 'payments';
-type ResourceTab = 'fleet' | 'drivers' | 'subcontractors' | 'clients';
+type ResourceTab = 'fleet' | 'drivers' | 'subcontractors' | 'clients' | 'team';
 
 export default function CompanyDashboard() {
   const [activeTab, setActiveTab] = useState<MainTab>('overview');
@@ -30,12 +40,35 @@ export default function CompanyDashboard() {
   const [activeResourceTab, setActiveResourceTab] = useState<ResourceTab>('fleet');
 
   const [stats, setStats] = useState<CompanyStats | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvoiceGenerator, setShowInvoiceGenerator] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    fetchUser();
   }, []);
+
+  const fetchUser = async () => {
+    try {
+      const response = await fetch('/api/user/me');
+      if (response.ok) {
+        if (!response.ok) {
+          // If fetching user fails or not authenticated, redirect happens by middleware or next interaction
+          return;
+        }
+        const data = await response.json();
+        setUser(data);
+
+        // If not admin, ensure operator lands on planning
+        if (data.role !== 'COMPANY_ADMIN') {
+          setActiveTab('planning');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -61,6 +94,8 @@ export default function CompanyDashboard() {
     }
   };
 
+  const isAdmin = user?.role === 'COMPANY_ADMIN';
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -78,12 +113,35 @@ export default function CompanyDashboard() {
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-gray-900">Espace Transporteur</h1>
             </div>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
-            >
-              Déconnexion
-            </button>
+            <div className="flex items-center gap-4">
+              {user && (
+                <div className="flex items-center gap-3 mr-4">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500">Administrateur</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border border-gray-200 text-blue-600 font-bold">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <span>{user.name.charAt(0)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`text-sm font-medium ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Mon Profil
+              </button>
+              <button
+                onClick={handleLogout}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+              >
+                Déconnexion
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -92,15 +150,17 @@ export default function CompanyDashboard() {
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8 overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'overview'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-            >
-              📊 Vue d'ensemble
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'overview'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+              >
+                📊 Vue d'ensemble
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('planning')}
               className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'planning'
@@ -110,24 +170,28 @@ export default function CompanyDashboard() {
             >
               🗓️ Planning & Opérations
             </button>
-            <button
-              onClick={() => setActiveTab('finance')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'finance'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-            >
-              💰 Finance
-            </button>
-            <button
-              onClick={() => setActiveTab('resources')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'resources'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-            >
-              📦 Ressources
-            </button>
+            {isAdmin && (
+              <>
+                <button
+                  onClick={() => setActiveTab('finance')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'finance'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  💰 Finance
+                </button>
+                <button
+                  onClick={() => setActiveTab('resources')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'resources'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  📦 Ressources
+                </button>
+              </>
+            )}
           </nav>
         </div>
       </div>
@@ -190,8 +254,8 @@ export default function CompanyDashboard() {
               <button
                 onClick={() => setActiveFinanceTab('invoices')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeFinanceTab === 'invoices'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 Facturation
@@ -199,8 +263,8 @@ export default function CompanyDashboard() {
               <button
                 onClick={() => setActiveFinanceTab('payments')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeFinanceTab === 'payments'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 Paiements Sous-traitants
@@ -237,8 +301,8 @@ export default function CompanyDashboard() {
               <button
                 onClick={() => setActiveResourceTab('fleet')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeResourceTab === 'fleet'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 🚛 Flotte
@@ -246,8 +310,8 @@ export default function CompanyDashboard() {
               <button
                 onClick={() => setActiveResourceTab('drivers')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeResourceTab === 'drivers'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 👥 Chauffeurs
@@ -255,8 +319,8 @@ export default function CompanyDashboard() {
               <button
                 onClick={() => setActiveResourceTab('subcontractors')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeResourceTab === 'subcontractors'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 🤝 Sous-traitants
@@ -264,12 +328,23 @@ export default function CompanyDashboard() {
               <button
                 onClick={() => setActiveResourceTab('clients')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeResourceTab === 'clients'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
                   }`}
               >
                 🏢 Clients
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setActiveResourceTab('team')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeResourceTab === 'team'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                >
+                  👥 Équipe
+                </button>
+              )}
             </div>
 
             {/* Resources Content */}
@@ -277,7 +352,15 @@ export default function CompanyDashboard() {
             {activeResourceTab === 'drivers' && <DriverList />}
             {activeResourceTab === 'subcontractors' && <SubcontractorList />}
             {activeResourceTab === 'clients' && <ClientList />}
+            {activeResourceTab === 'team' && isAdmin && <TeamList />}
           </div>
+        )}
+
+        {activeTab === 'profile' && (
+          <CompanyProfile
+            userAvatar={user?.avatar}
+            onAvatarUpdate={(url) => setUser(prev => prev ? { ...prev, avatar: url } : null)}
+          />
         )}
       </main>
     </div>

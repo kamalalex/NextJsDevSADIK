@@ -11,6 +11,16 @@ export async function GET(request: NextRequest) {
 
         const companyId = user.companyId;
 
+        // Initialiser la clause where de base pour les opérations
+        const operationWhere: any = {
+            transportCompanyId: companyId
+        };
+
+        // Restrict COMPANY_OPERATOR to only see their own operations details
+        if (user.role === 'COMPANY_OPERATOR') {
+            operationWhere.createdById = user.userId;
+        }
+
         // Récupérer les stats
         const [
             totalOperations,
@@ -22,19 +32,19 @@ export async function GET(request: NextRequest) {
         ] = await Promise.all([
             // Total opérations
             prisma.operation.count({
-                where: { transportCompanyId: companyId }
+                where: operationWhere
             }),
             // Opérations en cours
             prisma.operation.count({
                 where: {
-                    transportCompanyId: companyId,
+                    ...operationWhere,
                     status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] }
                 }
             }),
             // Opérations terminées
             prisma.operation.count({
                 where: {
-                    transportCompanyId: companyId,
+                    ...operationWhere,
                     status: 'DELIVERED'
                 }
             }),
@@ -49,7 +59,7 @@ export async function GET(request: NextRequest) {
             // Chiffre d'affaires (basé sur salePrice pour l'instant)
             prisma.operation.aggregate({
                 where: {
-                    transportCompanyId: companyId,
+                    ...operationWhere,
                     status: 'DELIVERED'
                 },
                 _sum: {

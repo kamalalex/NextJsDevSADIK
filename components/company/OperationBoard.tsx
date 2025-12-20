@@ -18,6 +18,7 @@ interface Operation {
     subcontractedByCompany?: boolean;
     salePrice?: number;
     purchasePrice?: number;
+    createdBy?: { name: string; role: string };
 }
 
 export default function OperationBoard() {
@@ -110,6 +111,11 @@ export default function OperationBoard() {
                                 </div>
                                 <div className="text-sm text-gray-500 mt-1">
                                     Client: <span className="font-medium text-gray-900">{op.client?.name || 'Inconnu'}</span>
+                                    {op.createdBy && (
+                                        <span className="ml-4 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                            Créé par: {op.createdBy.name}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                             <div className="text-right text-sm text-gray-500">
@@ -185,12 +191,23 @@ export default function OperationBoard() {
 
                             <div className="flex space-x-2">
                                 {/* Only show Assigner button if operation is not delivered or cancelled */}
-                                {op.status !== 'DELIVERED' && op.status !== 'CANCELLED' && (
+                                {/* Only show Assigner button if operation is not delivered/cancelled AND not not yet assigned */}
+                                {op.status !== 'DELIVERED' && op.status !== 'CANCELLED' && !op.assignedDriver && !op.subcontractor && (
                                     <button
                                         onClick={() => setSelectedOpForAssignment(op)}
                                         className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50"
                                     >
                                         Assigner
+                                    </button>
+                                )}
+
+                                {/* Show Reassign/Edit button if assigned but not started? Optional but good UX. For now just fixing the bug. */}
+                                {op.status !== 'DELIVERED' && op.status !== 'CANCELLED' && (op.assignedDriver || op.subcontractor) && (
+                                    <button
+                                        onClick={() => setSelectedOpForAssignment(op)}
+                                        className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 text-gray-600"
+                                    >
+                                        Modifier l'assignation
                                     </button>
                                 )}
 

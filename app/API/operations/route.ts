@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         whereClause.OR.push({ clientId: user.companyId });
       }
       // Si c'est un transporteur, il voit aussi les opérations où il est le transporteur
-      else if (user.role === 'COMPANY_ADMIN' || user.role === 'COMPANY_OPERATOR') {
+      else if (user.role === 'COMPANY_ADMIN') {
         whereClause.OR.push({ transportCompanyId: user.companyId });
       }
     }
