@@ -89,7 +89,7 @@ export function generateInvoicePDF(
 
     doc.setFontSize(10);
     doc.text(`Total HT:`, 140, finalY);
-    doc.text(`${invoice.amount.toFixed(2)} MAD`, 190, finalY, { align: 'right' });
+    doc.text(`${invoice.subtotal.toFixed(2)} MAD`, 190, finalY, { align: 'right' });
 
     doc.text(`Taxe (TVA):`, 140, finalY + 7);
     doc.text(`${invoice.taxAmount.toFixed(2)} MAD`, 190, finalY + 7, { align: 'right' });

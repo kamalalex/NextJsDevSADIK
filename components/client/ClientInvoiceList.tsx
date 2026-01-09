@@ -19,7 +19,7 @@ interface Invoice {
     number: string;
     date: string;
     dueDate: string;
-    amount: number;
+    subtotal: number;
     taxAmount: number;
     totalAmount: number;
     status: string;
