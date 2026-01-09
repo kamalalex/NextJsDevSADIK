@@ -46,11 +46,10 @@ export async function POST(request: NextRequest) {
                     number: invoiceNumber,
                     date: new Date(),
                     dueDate: new Date(dueDate || new Date()),
-                    amount: totalHT,
+                    subtotal: totalHT,
                     taxAmount: taxAmount,
                     totalAmount: totalTTC,
-                    taxRate: taxRate,
-                    status: 'EN_ATTENTE',
+                    status: 'DRAFT',
                     clientId: clientId,
                     transportCompanyId: user.companyId as string,
                     operations: {

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Trouver le chauffeur par son code SADIC
-        const driver = await prisma.driver.findUnique({
+        const driver = await prisma.driver.findFirst({
             where: { sadicCode }
         });
 

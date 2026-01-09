@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Trouver le client
-        const client = await prisma.company.findUnique({
+        const client = await prisma.company.findFirst({
             where: { sadicCode: sadicCode }
         });
 

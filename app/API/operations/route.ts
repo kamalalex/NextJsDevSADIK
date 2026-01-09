@@ -60,7 +60,6 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         updatedAt: true,
         licensePlate: true,
-        licensePlate: true,
         sealNumber: true,
         trackingUpdates: {
           orderBy: { createdAt: 'desc' },
@@ -295,7 +294,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Opération non trouvée ou accès non autorisé' }, { status: 404 });
     }
 
-    const allowedStatuses = ['PENDING', 'EN_ATTENTE'];
+    const allowedStatuses = ['PENDING'];
     if (!allowedStatuses.includes(existingOperation.status)) {
       return NextResponse.json({ error: 'Cette opération ne peut plus être modifiée car elle est déjà traitée' }, { status: 400 });
     }

@@ -16,6 +16,7 @@ interface Operation {
     assignedVehicle?: { id: string; plateNumber: string };
     subcontractor?: { id: string; companyName: string };
     subcontractedByCompany?: boolean;
+    salePrice?: number;
     purchasePrice?: number;
     createdBy?: { name: string; role: string };
     trackingUpdates?: any[];

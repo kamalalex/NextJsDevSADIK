@@ -49,14 +49,14 @@ export async function POST(
             hasPermission = true;
         } else {
             const user = await prisma.user.findUnique({ where: { id: authUser.userId } });
-            
+
             if (user?.companyId) {
                 // Vérifier si l'utilisateur appartient à la même compagnie que le créateur
                 const creator = await prisma.user.findUnique({ where: { id: operation.createdById } });
                 if (creator?.companyId && user.companyId === creator.companyId) {
                     hasPermission = true;
                 }
-                
+
                 // Vérifier si l'utilisateur appartient à la compagnie cliente de l'opération
                 if (operation.clientId && user.companyId === operation.clientId) {
                     hasPermission = true;
@@ -77,7 +77,7 @@ export async function POST(
         }
 
         // Vérifier le statut
-        const allowedStatuses = ['PENDING', 'EN_ATTENTE', 'CONFIRMED', 'CONFIRME'];
+        const allowedStatuses = ['PENDING', 'CONFIRMED'];
         if (!allowedStatuses.includes(operation.status)) {
             return NextResponse.json(
                 { error: 'Cette opération ne peut plus être annulée' },

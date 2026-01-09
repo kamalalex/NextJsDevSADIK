@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 1. Find the target company by code
-        const targetCompany = await prisma.company.findUnique({
+        const targetCompany = await prisma.company.findFirst({
             where: { sadicCode }
         });
 
