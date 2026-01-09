@@ -9,10 +9,19 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Pour l'instant, on retourne toutes les compagnies de type CLIENT
-        // Idéalement, on filtrerait celles avec qui on a des opérations
+        // Récupérer l'entreprise courante pour avoir ses linkedClientIds
+        const currentCompany = await prisma.company.findUnique({
+            where: { id: user.companyId },
+            select: { linkedClientIds: true }
+        });
+
+        const linkedClientIds = currentCompany?.linkedClientIds || [];
+
         const clients = await prisma.company.findMany({
-            where: { type: 'CLIENT_COMPANY' },
+            where: {
+                type: 'CLIENT_COMPANY',
+                id: { in: linkedClientIds }
+            },
             orderBy: { name: 'asc' }
         });
 
@@ -30,7 +39,10 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { name, address, phone, email } = body;
+        const { name, address, phone, email, ice, contactPerson, contactPhone, contactEmail } = body;
+
+        // Generate SADIC Code for new client
+        const code = `CLI-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
 
         const client = await prisma.company.create({
             data: {
@@ -38,8 +50,23 @@ export async function POST(request: NextRequest) {
                 address,
                 phone,
                 email,
+                ice,
+                contactPerson,
+                contactPhone,
+                contactEmail,
+                sadicCode: code,
                 type: 'CLIENT_COMPANY',
                 isActive: true
+            }
+        });
+
+        // Link the new client to the creator company
+        await prisma.company.update({
+            where: { id: user.companyId },
+            data: {
+                linkedClientIds: {
+                    push: client.id
+                }
             }
         });
 

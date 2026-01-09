@@ -20,6 +20,7 @@ interface CompanyStats {
   availableVehicles: number;
   activeDrivers: number;
   totalRevenue: number;
+  sadicCode?: string;
 }
 
 interface UserProfile {
@@ -112,6 +113,11 @@ export default function CompanyDashboard() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-gray-900">Espace Transporteur</h1>
+              {stats?.sadicCode && (
+                <span className="ml-4 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-mono font-bold tracking-wider border border-purple-200">
+                  ID: {stats.sadicCode}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-4">
               {user && (
@@ -359,7 +365,9 @@ export default function CompanyDashboard() {
         {activeTab === 'profile' && (
           <CompanyProfile
             userAvatar={user?.avatar}
+            currentName={user?.name}
             onAvatarUpdate={(url) => setUser(prev => prev ? { ...prev, avatar: url } : null)}
+            onNameUpdate={(newName) => setUser(prev => prev ? { ...prev, name: newName } : null)}
           />
         )}
       </main>

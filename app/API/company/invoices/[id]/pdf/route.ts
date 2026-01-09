@@ -20,6 +20,7 @@ export async function GET(
             include: {
                 client: true,
                 transportCompany: true,
+                items: true,
                 operations: {
                     include: {
                         assignedVehicle: true

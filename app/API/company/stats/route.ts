@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
             completedOperations,
             vehicles,
             drivers,
-            revenue
+            revenue,
+            companyInfo
         ] = await Promise.all([
             // Total opérations
             prisma.operation.count({
@@ -65,6 +66,11 @@ export async function GET(request: NextRequest) {
                 _sum: {
                     salePrice: true
                 }
+            }),
+            // Info compagnie
+            prisma.company.findUnique({
+                where: { id: companyId },
+                select: { sadicCode: true }
             })
         ]);
 
@@ -74,7 +80,8 @@ export async function GET(request: NextRequest) {
             completedOperations,
             availableVehicles: vehicles,
             activeDrivers: drivers,
-            totalRevenue: revenue._sum.salePrice || 0
+            totalRevenue: revenue._sum.salePrice || 0,
+            sadicCode: companyInfo?.sadicCode
         });
 
     } catch (error) {

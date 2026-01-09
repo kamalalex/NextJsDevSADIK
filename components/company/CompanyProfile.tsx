@@ -4,7 +4,19 @@
 import { useState, useRef } from 'react';
 import { User, Lock, Save, AlertCircle, CheckCircle, Camera, Upload } from 'lucide-react';
 
-export default function CompanyProfile({ userAvatar, onAvatarUpdate }: { userAvatar?: string | null, onAvatarUpdate?: (url: string) => void }) {
+export default function CompanyProfile({
+    userAvatar,
+    currentName,
+    onAvatarUpdate,
+    onNameUpdate
+}: {
+    userAvatar?: string | null,
+    currentName?: string,
+    onAvatarUpdate?: (url: string) => void,
+    onNameUpdate?: (newName: string) => void
+}) {
+    const [name, setName] = useState(currentName || '');
+    const [updatingName, setUpdatingName] = useState(false);
     const [formData, setFormData] = useState({
         oldPassword: '',
         newPassword: '',
@@ -141,6 +153,45 @@ export default function CompanyProfile({ userAvatar, onAvatarUpdate }: { userAva
         }
     };
 
+    const handleUpdateName = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name || name.trim() === currentName) return;
+
+        setUpdatingName(true);
+        setStatus({ type: null, message: '' });
+
+        try {
+            const response = await fetch('/api/user/me', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim() }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Erreur lors de la mise à jour du nom');
+            }
+
+            setStatus({
+                type: 'success',
+                message: 'Nom mis à jour avec succès !',
+            });
+
+            if (onNameUpdate) {
+                onNameUpdate(data.name);
+            }
+
+        } catch (error) {
+            setStatus({
+                type: 'error',
+                message: (error as Error).message,
+            });
+        } finally {
+            setUpdatingName(false);
+        }
+    };
+
     return (
         <div className="max-w-2xl mx-auto space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6 border">
@@ -205,6 +256,40 @@ export default function CompanyProfile({ userAvatar, onAvatarUpdate }: { userAva
                                 )}
                             </div>
                         </div>
+                    </div>
+
+                    {/* Section Informations Personnelles */}
+                    <div className="border-b pb-8">
+                        <div className="flex items-center gap-2 mb-4">
+                            <User className="w-5 h-5 text-gray-500" />
+                            <h3 className="text-lg font-medium text-gray-900">Informations Personnelles</h3>
+                        </div>
+
+                        <form onSubmit={handleUpdateName} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Nom complet
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                                        placeholder="Votre nom"
+                                        required
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={updatingName || name.trim() === currentName}
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                                    >
+                                        {updatingName ? '...' : <Save className="w-4 h-4" />}
+                                        Enregistrer
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
 
                     {/* Section Changement de mot de passe */}

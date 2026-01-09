@@ -60,7 +60,17 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         updatedAt: true,
         licensePlate: true,
+        licensePlate: true,
         sealNumber: true,
+        trackingUpdates: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            status: true,
+            note: true,
+            createdAt: true,
+            recordedBy: true
+          }
+        },
         // Inclure les relations
         createdBy: {
           select: {

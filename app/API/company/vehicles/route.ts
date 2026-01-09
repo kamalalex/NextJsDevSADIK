@@ -10,25 +10,68 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // 1. Get IDs of linked companies (via Subcontractor relation)
+        const mySubcontractors = await prisma.subcontractor.findMany({
+            where: {
+                transportCompanyId: user.companyId,
+                linkedCompanyId: { not: null }
+            },
+            select: { linkedCompanyId: true }
+        });
+
+        const linkedCompanyIds = mySubcontractors
+            .map(s => s.linkedCompanyId)
+            .filter((id): id is string => id !== null);
+
         const vehicles = await prisma.vehicle.findMany({
             where: {
                 OR: [
+                    // A. My own vehicles
                     { companyId: user.companyId },
-                    { subcontractor: { transportCompanyId: user.companyId } }
+                    // B. Vehicles of manual subcontractors
+                    { subcontractor: { transportCompanyId: user.companyId } },
+                    // C. Vehicles of linked companies
+                    { companyId: { in: linkedCompanyIds } }
                 ]
             },
             include: {
                 subcontractor: {
-                    select: {
-                        id: true,
-                        companyName: true
-                    }
+                    select: { id: true, companyName: true }
+                },
+                company: {
+                    select: { name: true, type: true }
+                },
+                driver: {
+                    select: { isIndependent: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        return NextResponse.json(vehicles);
+        // Compute source for frontend
+        const enrichedVehicles = vehicles.map(v => {
+            let source = 'INTERNAL';
+            let displayCompanyName = v.company?.name;
+
+            if (v.subcontractor) {
+                source = 'SUBCONTRACTOR';
+                displayCompanyName = v.subcontractor.companyName;
+            } else if (v.driver?.isIndependent) {
+                source = 'INDEPENDENT';
+                displayCompanyName = 'Indépendant';
+            } else if (v.companyId && v.companyId !== user.companyId) {
+                source = 'LINKED_COMPANY';
+                displayCompanyName = v.company?.name;
+            }
+
+            return {
+                ...v,
+                source,
+                displayCompanyName
+            };
+        });
+
+        return NextResponse.json(enrichedVehicles);
     } catch (error) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
@@ -53,7 +96,13 @@ export async function POST(request: NextRequest) {
             insuranceDate,
             documents,
             ptac,
-            subcontractorId
+            subcontractorId,
+            length,
+            width,
+            height,
+            registrationFront,
+            registrationBack,
+            vehiclePhoto
         } = body;
 
         const data: any = {
@@ -67,7 +116,13 @@ export async function POST(request: NextRequest) {
             technicalInspectionDate: technicalInspectionDate ? new Date(technicalInspectionDate) : null,
             insuranceDate: insuranceDate ? new Date(insuranceDate) : null,
             documents: documents || [],
+            registrationFront,
+            registrationBack,
+            vehiclePhoto,
             ptac: ptac as PtacType,
+            length,
+            width,
+            height,
         };
 
         if (subcontractorId) {

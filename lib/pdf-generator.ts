@@ -15,7 +15,7 @@ interface ExtendedOperation extends Operation {
 }
 
 export function generateInvoicePDF(
-    invoice: Invoice & { client: Company, transportCompany: Company },
+    invoice: Invoice & { client: Company, transportCompany: Company, items?: any[] },
     operations: ExtendedOperation[]
 ): ArrayBuffer {
     const doc = new jsPDF() as jsPDFWithAutoTable;
@@ -37,8 +37,8 @@ export function generateInvoicePDF(
 
     doc.setFontSize(10);
     doc.text(`N° Facture: ${invoice.number}`, 140, 30);
-    doc.text(`Date: ${new Date(invoice.date).toLocaleDateString()}`, 140, 35);
-    doc.text(`Échéance: ${new Date(invoice.dueDate).toLocaleDateString()}`, 140, 40);
+    doc.text(`Date: ${new Date(invoice.date).toLocaleDateString('fr-FR')}`, 140, 35);
+    doc.text(`Échéance: ${new Date(invoice.dueDate).toLocaleDateString('fr-FR')}`, 140, 40);
 
     // Client Info
     doc.setFontSize(12);
@@ -48,20 +48,32 @@ export function generateInvoicePDF(
     doc.text(client.address || '', 14, 67);
     doc.text(`Tél: ${client.phone || ''}`, 14, 72);
 
-    // Operations Table
-    const tableColumn = ["Date", "Référence", "Description", "Véhicule", "Montant HT"];
-    const tableRows = operations.map(op => {
-        const loadingAddr = Array.isArray(op.loadingPoints) ? op.loadingPoints[0]?.address || '' : '';
-        const unloadingAddr = Array.isArray(op.unloadingPoints) ? op.unloadingPoints[0]?.address || '' : '';
+    // Table Logic: Use items if present, otherwise fallback to operations
+    let tableColumn: string[] = [];
+    let tableRows: any[][] = [];
 
-        return [
-            new Date(op.operationDate).toLocaleDateString(),
-            op.reference,
-            `Transport ${loadingAddr} -> ${unloadingAddr}`,
-            op.assignedVehicle?.plateNumber || 'N/A',
-            `${(op.salePrice || 0).toFixed(2)} €`
-        ];
-    });
+    if (invoice.items && invoice.items.length > 0) {
+        tableColumn = ["Description", "Quantité", "TVA (%)", "Total TTC"];
+        tableRows = invoice.items.map(item => [
+            item.description,
+            item.quantity.toString(),
+            `${item.vatRate}%`,
+            `${item.totalLine.toFixed(2)} MAD`
+        ]);
+    } else {
+        tableColumn = ["Date", "Référence", "Description", "Montant Total"];
+        tableRows = operations.map(op => {
+            const loadingAddr = Array.isArray(op.loadingPoints) ? op.loadingPoints[0]?.address || '' : '';
+            const unloadingAddr = Array.isArray(op.unloadingPoints) ? op.unloadingPoints[0]?.address || '' : '';
+
+            return [
+                new Date(op.operationDate).toLocaleDateString('fr-FR'),
+                op.reference,
+                `Transport ${loadingAddr} -> ${unloadingAddr}`,
+                `${(op.salePrice || 0).toFixed(2)} MAD` // Adjusted for legacy simplification
+            ];
+        });
+    }
 
     autoTable(doc, {
         head: [tableColumn],
@@ -69,27 +81,28 @@ export function generateInvoicePDF(
         startY: 80,
         theme: 'grid',
         styles: { fontSize: 9 },
-        headStyles: { fillColor: [66, 66, 66] }
+        headStyles: { fillColor: [43, 67, 208] } // Use a more premium indigo color
     });
 
     // Totals
-    const finalY = doc.lastAutoTable.finalY + 10;
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
 
+    doc.setFontSize(10);
     doc.text(`Total HT:`, 140, finalY);
-    doc.text(`${invoice.amount.toFixed(2)} €`, 170, finalY, { align: 'right' });
+    doc.text(`${invoice.amount.toFixed(2)} MAD`, 190, finalY, { align: 'right' });
 
-    doc.text(`TVA (${invoice.taxRate}%):`, 140, finalY + 7);
-    doc.text(`${invoice.taxAmount.toFixed(2)} €`, 170, finalY + 7, { align: 'right' });
+    doc.text(`Taxe (TVA):`, 140, finalY + 7);
+    doc.text(`${invoice.taxAmount.toFixed(2)} MAD`, 190, finalY + 7, { align: 'right' });
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total TTC:`, 140, finalY + 15);
-    doc.text(`${invoice.totalAmount.toFixed(2)} €`, 170, finalY + 15, { align: 'right' });
+    doc.text(`Total Net à Payer:`, 140, finalY + 15);
+    doc.text(`${invoice.totalAmount.toFixed(2)} MAD`, 190, finalY + 15, { align: 'right' });
 
     // Footer
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text('Merci de votre confiance.', 14, finalY + 30);
+    doc.text('Merci de votre confiance. Facture générée via Sadic Trans.', 14, finalY + 30);
 
     return doc.output('arraybuffer');
 }
@@ -111,7 +124,7 @@ export function generatePaymentSummaryPDF(
 
     doc.setFontSize(10);
     doc.text(`N° Paiement: ${payment.paymentNumber}`, 120, 30);
-    doc.text(`Date: ${new Date(payment.paymentDate).toLocaleDateString()}`, 120, 35);
+    doc.text(`Date: ${new Date(payment.paymentDate).toLocaleDateString('fr-FR')}`, 120, 35);
 
     // Subcontractor Info
     doc.text(`Bénéficiaire: ${subcontractor.companyName}`, 14, 50);
@@ -124,10 +137,10 @@ export function generatePaymentSummaryPDF(
         const unloadingAddr = Array.isArray(op.unloadingPoints) ? op.unloadingPoints[0]?.address || '' : '';
 
         return [
-            new Date(op.operationDate).toLocaleDateString(),
+            new Date(op.operationDate).toLocaleDateString('fr-FR'),
             op.reference,
             `Transport ${loadingAddr} -> ${unloadingAddr}`,
-            `${(op.purchasePrice || 0).toFixed(2)} €`
+            `${(op.purchasePrice || 0).toFixed(2)} MAD`
         ];
     });
 
@@ -139,10 +152,10 @@ export function generatePaymentSummaryPDF(
     });
 
     // Total
-    const finalY = doc.lastAutoTable.finalY + 10;
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Payé: ${payment.totalAmount.toFixed(2)} €`, 140, finalY, { align: 'right' });
+    doc.text(`Total Payé: ${payment.totalAmount.toFixed(2)} MAD`, 140, finalY, { align: 'right' });
 
     return doc.output('arraybuffer');
 }

@@ -9,24 +9,66 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // 1. Get IDs of linked companies (via Subcontractor relation)
+        const mySubcontractors = await prisma.subcontractor.findMany({
+            where: {
+                transportCompanyId: user.companyId,
+                linkedCompanyId: { not: null }
+            },
+            select: { linkedCompanyId: true }
+        });
+
+        const linkedCompanyIds = mySubcontractors
+            .map(s => s.linkedCompanyId)
+            .filter((id): id is string => id !== null);
+
         const drivers = await prisma.driver.findMany({
             where: {
                 OR: [
+                    // A. My own drivers
                     { companyId: user.companyId },
-                    { subcontractor: { transportCompanyId: user.companyId } }
+                    // B. Drivers of manual subcontractors (assigned via subcontractorId)
+                    { subcontractor: { transportCompanyId: user.companyId } },
+                    // C. Drivers of linked companies
+                    { companyId: { in: linkedCompanyIds } }
                 ]
             },
             include: {
                 subcontractor: {
-                    select: {
-                        companyName: true
-                    }
+                    select: { companyName: true }
+                },
+                company: {
+                    select: { name: true, type: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        return NextResponse.json(drivers);
+        // Compute source for frontend
+        const enrichedDrivers = drivers.map(d => {
+            let source = 'INTERNAL'; // Default
+            let displayCompanyName = d.company?.name;
+
+            if (d.isIndependent) {
+                source = 'INDEPENDENT';
+                displayCompanyName = 'Indépendant';
+            } else if (d.subcontractor) {
+                source = 'SUBCONTRACTOR'; // Manual ST
+                displayCompanyName = d.subcontractor.companyName;
+            } else if (d.companyId && d.companyId !== user.companyId) { // Check assuming string comparison
+                // Wait, user.companyId is available here!
+                source = 'LINKED_COMPANY';
+                displayCompanyName = d.company?.name;
+            }
+
+            return {
+                ...d,
+                source,
+                displayCompanyName
+            };
+        });
+
+        return NextResponse.json(enrichedDrivers);
     } catch (error) {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
@@ -48,7 +90,12 @@ export async function POST(request: NextRequest) {
             cin,
             licenseDate,
             documents,
-            subcontractorId
+            subcontractorId,
+            idCardFront,
+            idCardBack,
+            licenseFront,
+            licenseBack,
+            licenseCategory
         } = body;
 
         // Check if driver with this email already exists
@@ -74,7 +121,12 @@ export async function POST(request: NextRequest) {
             isIndependent: false,
             cin,
             licenseDate: licenseDate ? new Date(licenseDate) : null,
-            documents: documents || []
+            documents: documents || [],
+            idCardFront,
+            idCardBack,
+            licenseFront,
+            licenseBack,
+            licenseCategory
         };
 
         if (subcontractorId) {

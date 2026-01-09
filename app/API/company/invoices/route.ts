@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { generateInvoiceNumber, calculateInvoiceTotals } from '@/lib/invoice-utils';
+import { generateInvoiceNumber, calculateDetailedInvoiceTotals } from '@/lib/invoice-utils';
+import { InvoiceStatus } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
     try {
@@ -19,18 +20,25 @@ export async function GET(request: NextRequest) {
         };
 
         if (clientId) whereClause.clientId = clientId;
-        if (status) whereClause.status = status;
+        if (status) whereClause.status = status as InvoiceStatus;
 
         const invoices = await prisma.invoice.findMany({
             where: whereClause,
             include: {
                 client: { select: { name: true } },
+                items: true,
+                installments: true,
                 operations: { select: { reference: true, operationDate: true } }
             },
             orderBy: { createdAt: 'desc' }
         });
 
-        return NextResponse.json(invoices);
+        const invoicesWithFallback = invoices.map(inv => ({
+            ...inv,
+            dueDate: (inv as any).dueDate || inv.date || inv.createdAt || new Date()
+        }));
+
+        return NextResponse.json(invoicesWithFallback);
     } catch (error) {
         console.error('Error fetching invoices:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
@@ -45,53 +53,96 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { clientId, operationIds, dueDate, taxRate = 20 } = body;
+        const {
+            clientId,
+            operationIds,
+            dueDate,
+            items,
+            notes,
+            terms,
+            partialPaymentsAllowed,
+            minPaymentPercentage,
+            maxInstallments
+        } = body;
 
-        if (!clientId || !operationIds || !Array.isArray(operationIds) || operationIds.length === 0) {
+        if (!clientId || (!operationIds && !items)) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // Fetch operations to calculate totals
-        const operations = await prisma.operation.findMany({
-            where: {
-                id: { in: operationIds },
-                transportCompanyId: user.companyId,
-                // Ensure operations are not already invoiced
-                invoiceId: { isSet: false }
-            }
-        });
+        let finalItems = items;
 
-        if (operations.length !== operationIds.length) {
-            return NextResponse.json({ error: 'Some operations not found or already invoiced' }, { status: 400 });
+        // If operationIds provided but no items, generate items from operations
+        if (operationIds && (!items || items.length === 0)) {
+            const operations = await prisma.operation.findMany({
+                where: {
+                    id: { in: operationIds },
+                    transportCompanyId: user.companyId,
+                    invoiceId: null
+                }
+            });
+
+            if (operations.length !== operationIds.length) {
+                return NextResponse.json({ error: 'Some operations not found or already invoiced' }, { status: 400 });
+            }
+
+            finalItems = operations.map(op => ({
+                description: `Transport ${op.reference}`,
+                quantity: 1,
+                unitPrice: op.salePrice || 0,
+                vatRate: 20, // Default VAT for auto-generation
+                taxAmount: (op.salePrice || 0) * 0.2,
+                totalLine: (op.salePrice || 0) * 1.2
+            }));
         }
 
-        // Calculate totals
-        const { totalHT, taxAmount, totalTTC } = calculateInvoiceTotals(operations, taxRate);
+        const { subtotal, taxTotal, totalAmount } = calculateDetailedInvoiceTotals(finalItems);
 
-        // Generate invoice number
-        // In a real app, we'd need a transaction or better sequence handling
         const count = await prisma.invoice.count({
             where: { transportCompanyId: user.companyId }
         });
         const invoiceNumber = generateInvoiceNumber(count + 1);
 
-        // Create invoice and update operations
         const invoice = await prisma.$transaction(async (tx) => {
             const newInvoice = await tx.invoice.create({
                 data: {
                     number: invoiceNumber,
-                    date: new Date(),
+                    date: new Date(), // This could be overridden if needed
                     dueDate: new Date(dueDate),
-                    amount: totalHT,
-                    taxAmount: taxAmount,
-                    totalAmount: totalTTC,
-                    taxRate: taxRate,
-                    status: 'EN_ATTENTE',
+                    subtotal,
+                    taxAmount: taxTotal,
+                    totalAmount,
+                    status: 'DRAFT',
+                    partialPaymentsAllowed: partialPaymentsAllowed || false,
+                    minPaymentPercentage,
+                    maxInstallments,
+                    notes,
+                    terms,
                     clientId: clientId,
                     transportCompanyId: user.companyId as string,
-                    operations: {
+                    items: {
+                        create: finalItems.map((item: any) => ({
+                            description: item.description,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                            vatRate: item.vatRate,
+                            taxAmount: item.taxAmount,
+                            totalLine: item.totalLine
+                        }))
+                    },
+                    operations: operationIds ? {
                         connect: operationIds.map((id: string) => ({ id }))
+                    } : undefined,
+                    history: {
+                        create: {
+                            statusTo: 'DRAFT',
+                            action: 'Invoice Created',
+                            userId: user.userId
+                        }
                     }
+                },
+                include: {
+                    items: true,
+                    history: true
                 }
             });
 

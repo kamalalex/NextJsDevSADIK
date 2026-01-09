@@ -23,6 +23,7 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   driver          Driver?
+  invoiceHistory  InvoiceHistory[]
   @@map("users")
 }
 
@@ -36,6 +37,10 @@ model Company {
   logo            String?
   ice             String?
   contactPerson   String?
+  contactPhone    String?
+  contactEmail    String?
+  sadicCode       String?
+  linkedClientIds String[]  @db.ObjectId
   isActive        Boolean   @default(true)
   trialEndsAt     DateTime?
   subscriptionStatus SubscriptionStatus @default(TRIAL)
@@ -49,6 +54,7 @@ model Company {
   transportInvoices Invoice[] @relation("TransportInvoices")
   subcontractorPayments SubcontractorPayment[] @relation("SubcontractorPayments")
   subcontractors  Subcontractor[]
+  servedSubcontractors Subcontractor[] @relation("LinkedCompanySubcontractor")
   createdAt       DateTime  @default(now())
   @@map("companies")
 }
@@ -162,9 +168,14 @@ model Vehicle {
   firstCirculationDate    DateTime?
   technicalInspectionDate DateTime?
   insuranceDate           DateTime?
-  dimensions              String?
-  documents               String[]
-  ptac                    PtacType?
+  length          Float?
+  width           Float?
+  height          Float?
+  documents       String[]
+  registrationFront String?
+  registrationBack  String?
+  vehiclePhoto      String?
+  ptac            PtacType?
   companyId       String?        @db.ObjectId
   company         Company?       @relation(fields: [companyId], references: [id])
   subcontractorId String?        @db.ObjectId
@@ -183,8 +194,10 @@ model Driver {
   email       String?
   phone       String
   license     String
+  licenseCategory LicenseCategory?
   status      DriverStatus @default(ACTIVE)
   cin         String?
+  sadicCode   String?
   licenseDate DateTime?
   documents   String[]
   companyId       String?        @db.ObjectId
@@ -193,6 +206,10 @@ model Driver {
   subcontractor   Subcontractor? @relation(fields: [subcontractorId], references: [id])
   isIndependent Boolean @default(false)
   professionalCard String?
+  idCardFront    String?
+  idCardBack     String?
+  licenseFront   String?
+  licenseBack    String?
   userId          String?   @unique @db.ObjectId
   user            User?     @relation(fields: [userId], references: [id])
   assignments DriverAssignment[]
@@ -218,6 +235,8 @@ model Subcontractor {
   payments    SubcontractorPayment[]
   transportCompanyId String   @db.ObjectId
   transportCompany   Company  @relation(fields: [transportCompanyId], references: [id])
+  linkedCompanyId    String?  @db.ObjectId
+  linkedCompany      Company? @relation("LinkedCompanySubcontractor", fields: [linkedCompanyId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("subcontractors")
@@ -227,22 +246,80 @@ model Invoice {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   number      String   @unique
   date        DateTime
-  amount      Float
+  subtotal    Float    @default(0)
   taxAmount   Float    @default(0)
-  totalAmount Float
-  taxRate     Float    @default(20)
-  status      InvoiceStatus @default(EN_ATTENTE)
-  dueDate     DateTime
-  paidAt      DateTime?
+  totalAmount Float    @default(0)
+  
+  status      InvoiceStatus @default(DRAFT)
+  paymentStatus PaymentStatus @default(PENDING)
+  dueDate     DateTime      @default(now()) // Added back
+  
+  // Partial Payments configuration
+  partialPaymentsAllowed Boolean @default(false)
+  minPaymentPercentage  Float?
+  maxInstallments       Int?
+  
+  // Relations
+  items        InvoiceLine[]
+  installments PaymentInstallment[]
+  history      InvoiceHistory[]
+  
+  notes       String?
+  terms       String?
   documentUrl String?
+  
   operations  Operation[]
   clientId    String   @db.ObjectId
   client      Company  @relation("ClientInvoices", fields: [clientId], references: [id])
   transportCompanyId String   @db.ObjectId
   transportCompany   Company  @relation("TransportInvoices", fields: [transportCompanyId], references: [id])
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("invoices")
+}
+
+model InvoiceLine {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  invoiceId   String   @db.ObjectId
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Float    @default(1)
+  unitPrice   Float
+  vatRate     Float    // e.g., 20, 12, etc.
+  taxAmount   Float    // total tax for this line
+  totalLine   Float    // quantity * unitPrice + taxAmount
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("invoice_lines")
+}
+
+model PaymentInstallment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  invoiceId   String   @db.ObjectId
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount      Float
+  dueDate     DateTime
+  paidAt      DateTime?
+  status      PaymentStatus @default(PENDING)
+  transactionRef String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("payment_installments")
+}
+
+model InvoiceHistory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  invoiceId   String   @db.ObjectId
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  statusFrom  InvoiceStatus?
+  statusTo    InvoiceStatus
+  action      String?   // Description of the action
+  userId      String    @db.ObjectId
+  user        User      @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  @@map("invoice_history")
 }
 
 model SubcontractorPayment {
@@ -273,6 +350,7 @@ enum UserRole {
   CLIENT_ADMIN
   CLIENT_LOGISTICS
   INDEPENDENT_DRIVER
+  EMPLOYED_DRIVER
 }
 
 enum CompanyType {
@@ -300,10 +378,13 @@ enum VehicleType {
 }
 
 enum PtacType {
+  PTAC_LESS_3_5T
   PTAC_3_5T
   PTAC_7T
   PTAC_14T
+  PTAC_19T
   PTAC_25T
+  PTAC_MORE_25T
 }
 
 enum PackagingType {
@@ -364,9 +445,15 @@ enum DriverStatus {
 }
 
 enum InvoiceStatus {
-  EN_ATTENTE
-  PAYEE
-  ANNULEE
+  DRAFT
+  APPROVED
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  REMINDER
+  DISPUTE
+  CANCELLED
 }
 
 enum SubscriptionStatus {
@@ -374,4 +461,14 @@ enum SubscriptionStatus {
   ACTIVE
   SUSPENDED
   EXPIRED
+}
+
+enum LicenseCategory {
+  A
+  B
+  C
+  D
+  EB
+  EC
+  ED
 }

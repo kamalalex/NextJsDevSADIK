@@ -38,9 +38,9 @@ interface Operation {
     id: string;
     plateNumber: string;
   };
-  totalWeight?: number;
   packaging?: string;
   quantity?: number;
+  trackingUpdates?: any[];
 }
 
 interface ClientStats {
@@ -74,6 +74,8 @@ export default function ClientDashboard() {
   // New state for modification
   const [operationToEdit, setOperationToEdit] = useState<Operation | null>(null);
 
+  const [clientInfo, setClientInfo] = useState<{ sadicCode?: string } | null>(null);
+
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -87,7 +89,20 @@ export default function ClientDashboard() {
 
   useEffect(() => {
     fetchData();
+    fetchClientInfo();
   }, []);
+
+  const fetchClientInfo = async () => {
+    try {
+      const response = await fetch('/api/client/info');
+      if (response.ok) {
+        const data = await response.json();
+        setClientInfo(data);
+      }
+    } catch (error) {
+      console.error('Error fetching client info:', error);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -254,13 +269,24 @@ export default function ClientDashboard() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-bold text-gray-900">Tableau de Bord Client</h1>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
-            >
-              Déconnexion
-            </button>
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-gray-900">Tableau de Bord Client</h1>
+              {clientInfo?.sadicCode && (
+                <span className="ml-4 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-mono font-bold tracking-wider border border-blue-200">
+                  ID: {clientInfo.sadicCode}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              <div>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                >
+                  Déconnexion
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -610,19 +636,44 @@ export default function ClientDashboard() {
                               )}
                             </div>
 
-                            <div>
-                              <h4 className="font-medium text-gray-900 mb-4">Suivi en temps réel</h4>
-                              <div className="h-64 rounded-lg border border-gray-200 overflow-hidden">
-                                <OperationMap
-                                  loadingPoints={operation.loadingPoints}
-                                  unloadingPoints={operation.unloadingPoints}
-                                  currentLocation={operation.currentLocation}
-                                  status={operation.status}
-                                />
+
+
+                            <div className="space-y-6">
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-4">Suivi en temps réel</h4>
+                                <div className="h-64 rounded-lg border border-gray-200 overflow-hidden">
+                                  <OperationMap
+                                    loadingPoints={operation.loadingPoints}
+                                    unloadingPoints={operation.unloadingPoints}
+                                    currentLocation={operation.currentLocation}
+                                    status={operation.status}
+                                  />
+                                </div>
+                                {operation.currentLocation && (
+                                  <div className="mt-2 text-sm text-gray-500">
+                                    Dernière mise à jour: {formatDate(operation.currentLocation.timestamp)}
+                                  </div>
+                                )}
                               </div>
-                              {operation.currentLocation && (
-                                <div className="mt-2 text-sm text-gray-500">
-                                  Dernière mise à jour: {formatDate(operation.currentLocation.timestamp)}
+
+                              {/* Historique de Suivi */}
+                              {operation.trackingUpdates && operation.trackingUpdates.length > 0 && (
+                                <div>
+                                  <h4 className="font-medium text-gray-900 mb-4">Historique de Suivi</h4>
+                                  <div className="bg-gray-50 rounded-lg p-4 max-h-60 overflow-y-auto">
+                                    <ul className="space-y-4">
+                                      {operation.trackingUpdates.map((update: any, idx: number) => (
+                                        <li key={idx} className="relative pl-4 border-l-2 border-blue-200 py-1">
+                                          <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-blue-400 ring-2 ring-white" />
+                                          <div className="text-sm font-medium">{update.note || update.status}</div>
+                                          <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                            <span>{new Date(update.createdAt).toLocaleString('fr-FR')}</span>
+                                            <span>{update.recordedBy}</span>
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -659,12 +710,15 @@ export default function ClientDashboard() {
               </>
             )}
           </div>
-        )}
+        )
+        }
 
-        {activeTab === 'factures' && (
-          <ClientInvoiceList />
-        )}
-      </main>
+        {
+          activeTab === 'factures' && (
+            <ClientInvoiceList />
+          )
+        }
+      </main >
 
       <OperationModal
         isOpen={isModalOpen}
@@ -689,6 +743,6 @@ export default function ClientDashboard() {
         onConfirm={handleCancelOperation}
         loading={cancellationLoading}
       />
-    </div>
+    </div >
   );
 }

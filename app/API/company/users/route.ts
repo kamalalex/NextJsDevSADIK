@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
                 email: true,
                 role: true,
                 isActive: true,
+                avatar: true,
                 createdAt: true,
             },
             orderBy: {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { name, email, password } = body;
+        const { name, email, password, role } = body;
 
         if (!name || !email || !password) {
             return NextResponse.json(
@@ -59,6 +60,10 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+
+        // Validate role
+        const validRoles = ['COMPANY_ADMIN', 'COMPANY_OPERATOR'];
+        const userRole = validRoles.includes(role) ? role : 'COMPANY_OPERATOR';
 
         // Vérifier si l'email existe déjà
         const existingUser = await prisma.user.findUnique({
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
                 name,
                 email,
                 password: hashedPassword,
-                role: 'COMPANY_OPERATOR',
+                role: userRole,
                 isActive: true, // Approuvé par défaut car créé par l'admin
                 companyId: userPayload.companyId,
             },

@@ -16,9 +16,9 @@ interface Operation {
     assignedVehicle?: { id: string; plateNumber: string };
     subcontractor?: { id: string; companyName: string };
     subcontractedByCompany?: boolean;
-    salePrice?: number;
     purchasePrice?: number;
     createdBy?: { name: string; role: string };
+    trackingUpdates?: any[];
 }
 
 export default function OperationBoard() {
@@ -133,6 +133,21 @@ export default function OperationBoard() {
                                 <div className="font-medium">{getAddress(op.unloadingPoints[0])}</div>
                             </div>
                         </div>
+
+                        {/* Tracking History Snippet */}
+                        {op.trackingUpdates && op.trackingUpdates.length > 0 && (
+                            <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-100">
+                                <p className="text-xs font-semibold text-blue-700 mb-2 uppercase">Dernier statut</p>
+                                <div className="flex justify-between items-start">
+                                    <div className="text-sm font-medium text-blue-900">
+                                        {op.trackingUpdates[0].note || op.trackingUpdates[0].status}
+                                    </div>
+                                    <div className="text-xs text-blue-600">
+                                        {new Date(op.trackingUpdates[0].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="border-t pt-4">
                             <div className="flex justify-between items-start mb-3">
