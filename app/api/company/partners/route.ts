@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
 
         const partners = await prisma.subcontractor.findMany({
             where: {
-                transportCompanyId: user.companyId,
+                OR: [
+                    { transportCompanyId: user.companyId },
+                    { linkedCompanyId: user.companyId }
+                ],
                 status: 'ACTIVE'
             },
             include: {
@@ -22,11 +25,44 @@ export async function GET(request: NextRequest) {
                         id: true,
                         name: true,
                         sadicCode: true,
-                        type: true
+                        type: true,
+                        phone: true,
+                        email: true
+                    }
+                },
+                transportCompany: {
+                    select: {
+                        id: true,
+                        name: true,
+                        sadicCode: true,
+                        type: true,
+                        phone: true,
+                        email: true
                     }
                 }
             }
         });
+
+        // Map results to a unified structure
+        const formattedPartners = partners.map(p => {
+            const isTransport = p.transportCompanyId === user.companyId;
+            const partnerCompany = isTransport ? p.linkedCompany : p.transportCompany;
+
+            return {
+                id: p.id,
+                name: partnerCompany?.name, // Use contact person or company name
+                companyName: partnerCompany?.name,
+                phone: partnerCompany?.phone,
+                email: partnerCompany?.email,
+                address: '',
+                status: p.status,
+                linkedCompany: partnerCompany, // Keep structure for frontend compatibility
+                // For client dashboard compatibility
+                transportCompany: partnerCompany
+            };
+        });
+
+        return NextResponse.json(formattedPartners);
 
         return NextResponse.json(partners);
 

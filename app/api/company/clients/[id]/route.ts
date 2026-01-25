@@ -71,23 +71,42 @@ export async function DELETE(
             return NextResponse.json({ error: 'Client not found' }, { status: 404 });
         }
 
-        // Vérifier s'il a des opérations liées
-        const operationsCount = await prisma.operation.count({
-            where: { clientId: id }
+        // Nouveau comportement : DÉLIER au lieu de SUPPRIMER
+        // On ne vérifie pas les opérations car on veut juste retirer le client de la liste de l'entreprise courante.
+        // Le client (Company) reste en base de données pour l'historique.
+
+        const currentCompany = await prisma.company.findUnique({
+            where: { id: user.companyId },
+            select: { linkedClientIds: true }
         });
 
-        if (operationsCount > 0) {
-            return NextResponse.json(
-                { error: 'Impossible de supprimer ce client car il est lié à des opérations.' },
-                { status: 400 }
-            );
+        if (currentCompany) {
+            const updatedLinkedIds = currentCompany.linkedClientIds.filter(clientId => clientId !== id);
+
+            await prisma.company.update({
+                where: { id: user.companyId },
+                data: {
+                    linkedClientIds: updatedLinkedIds
+                }
+            });
         }
 
-        await prisma.company.delete({
-            where: { id: id }
+        // Optionnel : Nettoyer aussi les liens partenaires s'ils existent
+        // (ex: si le transporteur avait ajouté ce client comme partenaire via SADIC)
+        const partnerLink = await prisma.subcontractor.findFirst({
+            where: {
+                transportCompanyId: user.companyId,
+                linkedCompanyId: id
+            }
         });
 
-        return NextResponse.json({ message: 'Client deleted successfully' });
+        if (partnerLink) {
+            await prisma.subcontractor.delete({
+                where: { id: partnerLink.id }
+            });
+        }
+
+        return NextResponse.json({ message: 'Client retiré de votre liste avec succès' });
 
     } catch (error) {
         console.error('Error deleting client:', error);

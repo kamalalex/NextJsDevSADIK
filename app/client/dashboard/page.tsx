@@ -7,6 +7,7 @@ import OperationMap from '../../../components/operations/OperationMap';
 import ClientInvoiceList from '../../../components/client/ClientInvoiceList';
 import CancellationModal from '../../../components/operations/CancellationModal';
 import PartnerList from '../../../components/company/PartnerList';
+import CompanyProfile from '../../../components/company/CompanyProfile';
 
 
 interface Operation {
@@ -65,7 +66,8 @@ export default function ClientDashboard() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tableau' | 'operations' | 'factures' | 'partenaires'>('tableau');
+  const [activeTab, setActiveTab] = useState<'tableau' | 'operations' | 'factures' | 'partenaires' | 'profile'>('tableau');
+  const [user, setUser] = useState<any>(null);
 
   const [selectedOperation, setSelectedOperation] = useState<Operation | null>(null);
 
@@ -93,6 +95,7 @@ export default function ClientDashboard() {
   useEffect(() => {
     fetchData();
     fetchClientInfo();
+    fetchUser();
   }, []);
 
   const fetchClientInfo = async () => {
@@ -104,6 +107,18 @@ export default function ClientDashboard() {
       }
     } catch (error) {
       console.error('Error fetching client info:', error);
+    }
+  };
+
+  const fetchUser = async () => {
+    try {
+      const response = await fetch('/api/user/me');
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error);
     }
   };
 
@@ -281,6 +296,27 @@ export default function ClientDashboard() {
               )}
             </div>
             <div className="flex items-center gap-4">
+              {user && (
+                <div className="flex items-center gap-3 mr-4">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500">{user.email}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border border-gray-200 text-blue-600 font-bold">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <span>{user.name?.charAt(0)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`text-sm font-medium ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Mon Profil
+              </button>
               <div>
                 <button
                   onClick={handleLogout}
@@ -725,6 +761,16 @@ export default function ClientDashboard() {
         {
           activeTab === 'partenaires' && (
             <PartnerList />
+          )
+        }
+        {
+          activeTab === 'profile' && (
+            <CompanyProfile
+              userAvatar={user?.avatar}
+              currentName={user?.name}
+              onAvatarUpdate={(url) => setUser((prev: any) => prev ? { ...prev, avatar: url } : null)}
+              onNameUpdate={(newName) => setUser((prev: any) => prev ? { ...prev, name: newName } : null)}
+            />
           )
         }
       </main >

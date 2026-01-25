@@ -60,13 +60,79 @@ export async function POST(request: NextRequest) {
         }
 
         if (action === 'CONFIRM') {
-            await prisma.subcontractor.update({
+            // 1. Mettre à jour le statut de la demande existante (Transporteur -> Client)
+            const updatedRequest = await prisma.subcontractor.update({
                 where: { id },
-                data: { status: 'ACTIVE' }
+                data: { status: 'ACTIVE' },
+                include: {
+                    transportCompany: true // On a besoin des infos du transporteur pour créer le lien inverse
+                }
             });
 
-            // Version réciproque (optionnel, mais utile si on veut que les deux voient le lien)
-            // Pour l'instant on reste simple : le demandeur voit l'actif.
+            // 2. Determine who is the Transporter and who is the Client
+            let transporterId: string;
+            let clientId: string;
+
+            if (updatedRequest.transportCompany.type === 'CLIENT_COMPANY') {
+                // Le client a initié la demande
+                transporterId = updatedRequest.linkedCompanyId!;
+                clientId = updatedRequest.transportCompanyId;
+            } else {
+                // Le transporteur a initié la demande
+                transporterId = updatedRequest.transportCompanyId;
+                clientId = updatedRequest.linkedCompanyId!;
+            }
+
+            // 3. Ajouter le client à la liste des clients du transporteur
+            if (transporterId && clientId) {
+                const transportCompany = await prisma.company.findUnique({
+                    where: { id: transporterId },
+                    select: { linkedClientIds: true }
+                });
+
+                if (transportCompany) {
+                    const clientAlreadyLinked = transportCompany.linkedClientIds.includes(clientId);
+
+                    if (!clientAlreadyLinked) {
+                        await prisma.company.update({
+                            where: { id: transporterId },
+                            data: {
+                                linkedClientIds: {
+                                    push: clientId
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+
+            // 3. Créer le lien inverse : Le client ajoue le transporteur comme partenaire
+            // (Pour que le client puisse voir le transporteur dans "Nouvelle Opération")
+
+            // Vérifier si le lien inverse existe déjà
+            const reverseLinkExists = await prisma.subcontractor.findFirst({
+                where: {
+                    transportCompanyId: user.companyId, // Le client (qui confirme) devient le "propriétaire" du lien
+                    linkedCompanyId: linkRequest.transportCompanyId // Le transporteur devient le "linkedCompany"
+                }
+            });
+
+            if (!reverseLinkExists && updatedRequest.transportCompany) {
+                await prisma.subcontractor.create({
+                    data: {
+                        name: updatedRequest.transportCompany.contactPerson || updatedRequest.transportCompany.name,
+                        companyName: updatedRequest.transportCompany.name,
+                        phone: updatedRequest.transportCompany.phone || '',
+                        email: updatedRequest.transportCompany.email || '',
+                        address: updatedRequest.transportCompany.address || '',
+                        companyId: updatedRequest.transportCompany.ice || '', // Utilisation du champ companyId pour ICE comme dans link/route.ts
+                        paymentWithInvoice: true,
+                        transportCompanyId: user.companyId, // Client
+                        linkedCompanyId: linkRequest.transportCompanyId, // Transporteur
+                        status: 'ACTIVE' // Directement actif car c'est une conséquence de l'acceptation
+                    }
+                });
+            }
 
             return NextResponse.json({ message: 'Demande confirmée avec succès' });
         } else {

@@ -17,13 +17,47 @@ export async function GET(request: NextRequest) {
 
         const linkedClientIds = currentCompany?.linkedClientIds || [];
 
-        const clients = await prisma.company.findMany({
+        // 1. Récupérer les clients liés via l'ancienne méthode (linkedClientIds)
+        const legacyClients = await prisma.company.findMany({
             where: {
                 type: 'CLIENT_COMPANY',
                 id: { in: linkedClientIds }
-            },
-            orderBy: { name: 'asc' }
+            }
         });
+
+        // 2. Récupérer les clients liés via la nouvelle méthode (Subcontractor/Partenariat)
+        // Cas A: Je suis Transporteur, le client est LinkedCompany (j'ai invité le client)
+        // Cas B: Je suis Transporteur, le client est TransportCompany (le client m'a invité)
+        const partnerLinks = await prisma.subcontractor.findMany({
+            where: {
+                OR: [
+                    { transportCompanyId: user.companyId, linkedCompany: { type: 'CLIENT_COMPANY' } },
+                    { linkedCompanyId: user.companyId, transportCompany: { type: 'CLIENT_COMPANY' } }
+                ],
+                status: 'ACTIVE'
+            },
+            include: {
+                linkedCompany: true,
+                transportCompany: true
+            }
+        });
+
+        const partnerClients = partnerLinks.map(link => {
+            return link.transportCompanyId === user.companyId
+                ? link.linkedCompany
+                : link.transportCompany;
+        });
+
+        // 3. Fusionner et dédoublonner
+        const allClientsMap = new Map();
+
+        [...legacyClients, ...partnerClients].forEach(client => {
+            if (client && !allClientsMap.has(client.id)) {
+                allClientsMap.set(client.id, client);
+            }
+        });
+
+        const clients = Array.from(allClientsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
         return NextResponse.json(clients);
     } catch (error) {

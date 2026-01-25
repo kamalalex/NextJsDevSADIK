@@ -343,15 +343,6 @@ export default function CompanyDashboard() {
               >
                 🏢 Clients
               </button>
-              <button
-                onClick={() => setActiveResourceTab('partners')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeResourceTab === 'partners'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-              >
-                🤝 Partenaires
-              </button>
               {isAdmin && (
                 <button
                   onClick={() => setActiveResourceTab('team')}
@@ -370,7 +361,6 @@ export default function CompanyDashboard() {
             {activeResourceTab === 'drivers' && <DriverList />}
             {activeResourceTab === 'subcontractors' && <SubcontractorList />}
             {activeResourceTab === 'clients' && <ClientList />}
-            {activeResourceTab === 'partners' && <PartnerList />}
             {activeResourceTab === 'team' && isAdmin && <TeamList />}
 
           </div>
