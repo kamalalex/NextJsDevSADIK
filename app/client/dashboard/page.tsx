@@ -6,6 +6,8 @@ import OperationModal from '../../../components/operations/OperationModal';
 import OperationMap from '../../../components/operations/OperationMap';
 import ClientInvoiceList from '../../../components/client/ClientInvoiceList';
 import CancellationModal from '../../../components/operations/CancellationModal';
+import PartnerList from '../../../components/company/PartnerList';
+
 
 interface Operation {
   id: string;
@@ -63,7 +65,8 @@ export default function ClientDashboard() {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tableau' | 'operations' | 'factures'>('tableau');
+  const [activeTab, setActiveTab] = useState<'tableau' | 'operations' | 'factures' | 'partenaires'>('tableau');
+
   const [selectedOperation, setSelectedOperation] = useState<Operation | null>(null);
 
   // New state for cancellation
@@ -312,17 +315,18 @@ export default function ClientDashboard() {
             >
               🚚 Opérations
               <span className="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-xs">
-                {operations.length}
+                {/*operations.length*/}
+                {stats?.operationsEnCours}
               </span>
             </button>
             <button
-              onClick={() => setActiveTab('factures')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'factures'
+              onClick={() => setActiveTab('partenaires')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'partenaires'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
             >
-              🧾 Factures
+              🤝 Partenaires
             </button>
           </nav>
         </div>
@@ -716,6 +720,11 @@ export default function ClientDashboard() {
         {
           activeTab === 'factures' && (
             <ClientInvoiceList />
+          )
+        }
+        {
+          activeTab === 'partenaires' && (
+            <PartnerList />
           )
         }
       </main >

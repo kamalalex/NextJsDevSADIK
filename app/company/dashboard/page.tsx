@@ -12,6 +12,8 @@ import SubcontractorPayments from '../../../components/company/SubcontractorPaym
 import FinancialDashboard from '../../../components/company/FinancialDashboard';
 import CompanyProfile from '../../../components/company/CompanyProfile';
 import TeamList from '../../../components/company/TeamList';
+import PartnerList from '../../../components/company/PartnerList';
+
 
 interface CompanyStats {
   totalOperations: number;
@@ -33,7 +35,8 @@ interface UserProfile {
 
 type MainTab = 'overview' | 'planning' | 'finance' | 'resources' | 'profile';
 type FinanceTab = 'invoices' | 'payments';
-type ResourceTab = 'fleet' | 'drivers' | 'subcontractors' | 'clients' | 'team';
+type ResourceTab = 'fleet' | 'drivers' | 'subcontractors' | 'partners' | 'clients' | 'team';
+
 
 export default function CompanyDashboard() {
   const [activeTab, setActiveTab] = useState<MainTab>('overview');
@@ -340,6 +343,15 @@ export default function CompanyDashboard() {
               >
                 🏢 Clients
               </button>
+              <button
+                onClick={() => setActiveResourceTab('partners')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${activeResourceTab === 'partners'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+              >
+                🤝 Partenaires
+              </button>
               {isAdmin && (
                 <button
                   onClick={() => setActiveResourceTab('team')}
@@ -358,7 +370,9 @@ export default function CompanyDashboard() {
             {activeResourceTab === 'drivers' && <DriverList />}
             {activeResourceTab === 'subcontractors' && <SubcontractorList />}
             {activeResourceTab === 'clients' && <ClientList />}
+            {activeResourceTab === 'partners' && <PartnerList />}
             {activeResourceTab === 'team' && isAdmin && <TeamList />}
+
           </div>
         )}
 

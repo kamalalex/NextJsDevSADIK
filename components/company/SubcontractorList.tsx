@@ -13,6 +13,7 @@ interface Subcontractor {
     paymentWithInvoice: boolean;
     vehicles?: any[];
     drivers?: any[];
+    sadicCode?: string;
 }
 
 export default function SubcontractorList() {
@@ -222,6 +223,11 @@ export default function SubcontractorList() {
                                 <div className="ml-4">
                                     <div className="flex items-center gap-2">
                                         <div className="text-sm font-medium text-gray-900">{sub.companyName}</div>
+                                        {sub.sadicCode && (
+                                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider border border-blue-100">
+                                                {sub.sadicCode}
+                                            </span>
+                                        )}
                                         {sub.paymentWithInvoice ? (
                                             <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-medium uppercase tracking-wider">Facture</span>
                                         ) : (

@@ -12,6 +12,7 @@ interface Client {
     contactPerson?: string;
     contactPhone?: string;
     contactEmail?: string;
+    sadicCode?: string;
 }
 
 export default function ClientList() {
@@ -219,7 +220,14 @@ export default function ClientList() {
                                     {client.name.charAt(0)}
                                 </div>
                                 <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">{client.name}</div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-medium text-gray-900">{client.name}</div>
+                                        {client.sadicCode && (
+                                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider border border-blue-100">
+                                                {client.sadicCode}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="text-sm text-gray-500">{client.email}</div>
                                     <div className="flex flex-col gap-0.5 mt-1">
                                         {client.ice && (

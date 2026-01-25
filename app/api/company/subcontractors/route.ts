@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
             paymentWithInvoice
         } = body;
 
+        const sadicCode = `SUB-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
+
         const subcontractor = await prisma.subcontractor.create({
             data: {
                 name,
@@ -29,7 +31,8 @@ export async function POST(request: NextRequest) {
                 address,
                 companyId: subcontractorCompanyId,
                 paymentWithInvoice,
-                transportCompanyId: user.companyId
+                transportCompanyId: user.companyId,
+                sadicCode
             }
         });
 
@@ -52,7 +55,8 @@ export async function GET(request: NextRequest) {
 
         const subcontractors = await prisma.subcontractor.findMany({
             where: {
-                transportCompanyId: user.companyId
+                transportCompanyId: user.companyId,
+                status: 'ACTIVE'
             },
             include: {
                 vehicles: true,

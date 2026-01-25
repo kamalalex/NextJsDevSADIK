@@ -228,6 +228,7 @@ model Subcontractor {
   email       String?
   address     String?
   companyId   String?
+  sadicCode   String?
   paymentWithInvoice Boolean @default(true)
   vehicles    Vehicle[]
   operations  Operation[]
@@ -237,6 +238,7 @@ model Subcontractor {
   transportCompany   Company  @relation(fields: [transportCompanyId], references: [id])
   linkedCompanyId    String?  @db.ObjectId
   linkedCompany      Company? @relation("LinkedCompanySubcontractor", fields: [linkedCompanyId], references: [id])
+  status             PartnerStatus @default(ACTIVE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("subcontractors")
@@ -471,4 +473,10 @@ enum LicenseCategory {
   EB
   EC
   ED
+}
+
+enum PartnerStatus {
+  PENDING
+  ACTIVE
+  REJECTED
 }

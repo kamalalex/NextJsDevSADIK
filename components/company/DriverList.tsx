@@ -28,6 +28,7 @@ interface Driver {
     licenseFront?: string;
     licenseBack?: string;
     licenseCategory?: string;
+    sadicCode?: string;
 }
 
 export default function DriverList() {
@@ -310,7 +311,14 @@ export default function DriverList() {
                                     {driver.name.charAt(0)}
                                 </div>
                                 <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">{driver.name}</div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-medium text-gray-900">{driver.name}</div>
+                                        {driver.sadicCode && (
+                                            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider border border-blue-100">
+                                                {driver.sadicCode}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="text-sm text-gray-500">
                                         {driver.phone}
                                         {/* Badge Type */}

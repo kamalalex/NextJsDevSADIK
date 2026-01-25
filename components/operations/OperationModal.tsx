@@ -29,6 +29,7 @@ interface OperationFormData {
   assignedVehicleId?: string;
   subcontractorId?: string;
   purchasePrice?: number; // Prix d'achat (sous-traitance)
+  transportCompanyId?: string; // Pour les clients
   assignMode: 'INTERNAL' | 'SUBCONTRACTOR';
 }
 
@@ -50,6 +51,7 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
     assignedVehicleId: '',
     subcontractorId: '',
     purchasePrice: undefined,
+    transportCompanyId: '',
     assignMode: 'INTERNAL'
   });
 
@@ -61,6 +63,7 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
   const [drivers, setDrivers] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [subcontractors, setSubcontractors] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]); // Partenaires actifs
 
   const isCompany = userRole === 'COMPANY_ADMIN' || userRole === 'COMPANY_OPERATOR';
 
@@ -108,14 +111,13 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
           assignedDriverId: '',
           assignedVehicleId: '',
           subcontractorId: '',
+          transportCompanyId: '',
           assignMode: 'INTERNAL'
         });
       }
 
-      // Fetch lists if company
-      if (isCompany) {
-        fetchLists();
-      }
+      // Fetch lists
+      fetchLists();
     }
   }, [isOpen, initialData, userRole]);
 
@@ -132,6 +134,11 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
       if (driversRes.ok) setDrivers(await driversRes.json());
       if (vehiclesRes.ok) setVehicles(await vehiclesRes.json());
       if (subcontractorsRes.ok) setSubcontractors(await subcontractorsRes.json());
+
+      // Fetch partners for both roles
+      const partnersRes = await fetch('/api/company/partners');
+      if (partnersRes.ok) setPartners(await partnersRes.json());
+
     } catch (error) {
       console.error('Error fetching lists:', error);
     }
@@ -235,7 +242,10 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
           payload.subcontractorId = null;
           payload.purchasePrice = null;
         }
+      } else {
+        payload.transportCompanyId = formData.transportCompanyId;
       }
+
 
       let response;
       if (initialData) {
@@ -363,6 +373,33 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
                   <option key={client.id} value={client.id}>{client.name}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Transporteur pour le Client */}
+          {!isCompany && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Transporteur <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={formData.transportCompanyId}
+                onChange={(e) => setFormData(prev => ({ ...prev, transportCompanyId: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sélectionner un transporteur partenaire</option>
+                {partners.map(partner => (
+                  <option key={partner.linkedCompany.id} value={partner.linkedCompany.id}>
+                    {partner.linkedCompany.name} ({partner.linkedCompany.sadicCode})
+                  </option>
+                ))}
+              </select>
+              {partners.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  ⚠️ Vous devez d'abord ajouter un transporteur partenaire via son code SADIC.
+                </p>
+              )}
             </div>
           )}
 

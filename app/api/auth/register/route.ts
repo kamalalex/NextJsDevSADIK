@@ -88,6 +88,10 @@ export async function POST(request: Request) {
                     throw new Error('Une entreprise avec ce nom existe déjà');
                 }
 
+                const sadicCode = companyType === 'TRANSPORT_COMPANY'
+                    ? `TRP-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`
+                    : `CLI-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
+
                 newCompany = await tx.company.create({
                     data: {
                         name: companyName,
@@ -97,6 +101,7 @@ export async function POST(request: Request) {
                         email,
                         ice,
                         contactPerson,
+                        sadicCode,
                         isActive: false, // Company also inactive? Or just user? Let's make company inactive too.
                         users: {
                             connect: { id: user.id },
@@ -111,6 +116,7 @@ export async function POST(request: Request) {
                 });
 
             } else if (type === 'INDEPENDENT_DRIVER') {
+                const sadicCode = `DRV-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
                 newDriver = await tx.driver.create({
                     data: {
                         name,
@@ -119,6 +125,7 @@ export async function POST(request: Request) {
                         license,
                         cin,
                         professionalCard,
+                        sadicCode,
                         isIndependent: true,
                         status: 'INACTIVE', // Wait for validation
                         userId: user.id,

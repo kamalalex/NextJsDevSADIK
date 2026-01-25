@@ -135,8 +135,13 @@ export async function POST(request: NextRequest) {
             data.companyId = user.companyId;
         }
 
+        const sadicCode = `DRV-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
+
         const driver = await prisma.driver.create({
-            data
+            data: {
+                ...data,
+                sadicCode
+            }
         });
 
         return NextResponse.json(driver);

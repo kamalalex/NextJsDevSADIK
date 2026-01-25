@@ -187,12 +187,18 @@ export async function POST(request: NextRequest) {
     // Logic based on role
     if (userExists.role === 'CLIENT_ADMIN' || userExists.role === 'CLIENT_LOGISTICS') {
       clientId = userExists.companyId;
-      // Auto-assign to first transport company
-      const transportCompany = await prisma.company.findFirst({
-        where: { type: 'TRANSPORT_COMPANY', isActive: true },
-        select: { id: true }
-      });
-      transportCompanyId = transportCompany?.id || null;
+
+      // If a transport company was selected in the modal
+      if (body.transportCompanyId) {
+        transportCompanyId = body.transportCompanyId;
+      } else {
+        // Fallback: Auto-assign to first transport company (legacy behavior)
+        const transportCompany = await prisma.company.findFirst({
+          where: { type: 'TRANSPORT_COMPANY', isActive: true },
+          select: { id: true }
+        });
+        transportCompanyId = transportCompany?.id || null;
+      }
     } else if (userExists.role === 'COMPANY_ADMIN' || userExists.role === 'COMPANY_OPERATOR') {
       // Created by transport company
       if (!body.clientId) {
