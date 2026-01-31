@@ -47,6 +47,7 @@ export default function LoginPage() {
             router.push('/client/dashboard');
             break;
           case 'INDEPENDENT_DRIVER':
+          case 'EMPLOYED_DRIVER':
             router.push('/driver/dashboard');
             break;
           default:

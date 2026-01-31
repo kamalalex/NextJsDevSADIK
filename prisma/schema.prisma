@@ -188,6 +188,8 @@ model Vehicle {
   @@map("vehicles")
 }
 
+// ... (enums)
+
 model Driver {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
@@ -212,12 +214,79 @@ model Driver {
   licenseBack    String?
   userId          String?   @unique @db.ObjectId
   user            User?     @relation(fields: [userId], references: [id])
+  
+  // HR Fields
+  baseSalary      Float?    @default(0)
+  expenses        DriverExpense[]
+  bonuses         DriverBonus[]
+  evaluations     DriverEvaluation[]
+
   assignments DriverAssignment[]
   vehicles    Vehicle[]
   operations  Operation[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("drivers")
+}
+
+model DriverExpense {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  driverId    String   @db.ObjectId
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  type        ExpenseType
+  amount      Float
+  date        DateTime
+  description String?
+  documentUrl String?
+  status      ExpenseStatus @default(PENDING)
+  rejectionReason String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("driver_expenses")
+}
+
+model DriverBonus {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  driverId    String   @db.ObjectId
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  amount      Float
+  date        DateTime
+  reason      String
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("driver_bonuses")
+}
+
+model DriverEvaluation {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  driverId    String   @db.ObjectId
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  rating      Int      // 1-5
+  comment     String?
+  date        DateTime @default(now())
+  evaluatorId String   @db.ObjectId // User who evaluated
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("driver_evaluations")
+}
+
+enum ExpenseType {
+  FUEL
+  TOLL
+  MAINTENANCE
+  MEAL
+  ACCOMMODATION
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
 }
 
 model Subcontractor {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import AssignmentModal from './AssignmentModal';
 import OperationModal from '@/components/operations/OperationModal';
+import TrackingModal from '@/components/operations/TrackingModal';
 
 interface Operation {
     id: string;
@@ -12,7 +13,7 @@ interface Operation {
     loadingPoints: any[];
     unloadingPoints: any[];
     client: { name: string };
-    assignedDriver?: { id: string; name: string };
+    assignedDriver?: { id: string; name: string; phone: string };
     assignedVehicle?: { id: string; plateNumber: string };
     subcontractor?: { id: string; companyName: string };
     subcontractedByCompany?: boolean;
@@ -20,12 +21,14 @@ interface Operation {
     purchasePrice?: number;
     createdBy?: { name: string; role: string };
     trackingUpdates?: any[];
+    currentLocation?: any;
 }
 
 export default function OperationBoard() {
     const [operations, setOperations] = useState<Operation[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedOpForAssignment, setSelectedOpForAssignment] = useState<Operation | null>(null);
+    const [selectedOpForTracking, setSelectedOpForTracking] = useState<Operation | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     useEffect(() => {
@@ -244,6 +247,15 @@ export default function OperationBoard() {
                                         Livrer
                                     </button>
                                 )}
+
+                                {(op.status === 'IN_PROGRESS' || op.status === 'CONFIRMED' || op.status === 'CONFIRME' || op.status === 'EN_COURS') && (
+                                    <button
+                                        onClick={() => setSelectedOpForTracking(op)}
+                                        className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200 border border-blue-200 flex items-center gap-1"
+                                    >
+                                        <span>📍</span> Suivre
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -256,19 +268,32 @@ export default function OperationBoard() {
                 )}
             </div>
 
-            {selectedOpForAssignment && (
-                <AssignmentModal
-                    isOpen={!!selectedOpForAssignment}
-                    onClose={() => setSelectedOpForAssignment(null)}
-                    operationId={selectedOpForAssignment.id}
-                    currentDriverId={selectedOpForAssignment.assignedDriver?.id}
-                    currentVehicleId={selectedOpForAssignment.assignedVehicle?.id}
-                    onSuccess={() => {
-                        fetchOperations();
-                        setSelectedOpForAssignment(null);
-                    }}
-                />
-            )}
+            {/* Tracking Modal */}
+            {
+                selectedOpForTracking && (
+                    <TrackingModal
+                        isOpen={!!selectedOpForTracking}
+                        onClose={() => setSelectedOpForTracking(null)}
+                        operation={selectedOpForTracking}
+                    />
+                )
+            }
+
+            {
+                selectedOpForAssignment && (
+                    <AssignmentModal
+                        isOpen={!!selectedOpForAssignment}
+                        onClose={() => setSelectedOpForAssignment(null)}
+                        operationId={selectedOpForAssignment.id}
+                        currentDriverId={selectedOpForAssignment.assignedDriver?.id}
+                        currentVehicleId={selectedOpForAssignment.assignedVehicle?.id}
+                        onSuccess={() => {
+                            fetchOperations();
+                            setSelectedOpForAssignment(null);
+                        }}
+                    />
+                )
+            }
 
             <OperationModal
                 isOpen={isCreateModalOpen}
@@ -279,6 +304,6 @@ export default function OperationBoard() {
                 }}
                 userRole="COMPANY_ADMIN"
             />
-        </div>
+        </div >
     );
 }

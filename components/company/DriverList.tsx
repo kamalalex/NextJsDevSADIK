@@ -29,6 +29,7 @@ interface Driver {
     licenseBack?: string;
     licenseCategory?: string;
     sadicCode?: string;
+    userId?: string;
 }
 
 export default function DriverList() {
@@ -192,6 +193,28 @@ export default function DriverList() {
             }
         } catch (error) {
             console.error('Error deleting driver:', error);
+        }
+    };
+
+    const handleCreateAccount = async (driverId: string) => {
+        if (!confirm("Voulez-vous créer un compte utilisateur pour ce chauffeur ? Un mot de passe par défaut (123456) lui sera attribué.")) return;
+
+        try {
+            const response = await fetch(`/api/company/drivers/${driverId}/create-account`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                alert('Compte créé avec succès ! Le chauffeur peut maintenant se connecter.');
+                fetchDrivers(); // Refresh list to update UI
+            } else {
+                alert(data.error || 'Erreur lors de la création du compte');
+            }
+        } catch (error) {
+            console.error('Error creating account:', error);
+            alert('Erreur serveur');
         }
     };
 
@@ -370,6 +393,21 @@ export default function DriverList() {
                                         >
                                             Supprimer
                                         </button>
+                                    )}
+                                </div>
+                                <div className="mt-2">
+                                    {(driver.source === 'INTERNAL' && !driver.userId) && (
+                                        <button
+                                            onClick={() => handleCreateAccount(driver.id)}
+                                            className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm"
+                                        >
+                                            📱 Activer App
+                                        </button>
+                                    )}
+                                    {driver.userId && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                                            📱 App Activée
+                                        </span>
                                     )}
                                 </div>
                             </div>

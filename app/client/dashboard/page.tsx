@@ -2,6 +2,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { Menu, X } from 'lucide-react';
+import TrackingModal from '../../../components/operations/TrackingModal';
 import OperationModal from '../../../components/operations/OperationModal';
 import OperationMap from '../../../components/operations/OperationMap';
 import ClientInvoiceList from '../../../components/client/ClientInvoiceList';
@@ -68,8 +70,10 @@ export default function ClientDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'tableau' | 'operations' | 'factures' | 'partenaires' | 'profile'>('tableau');
   const [user, setUser] = useState<any>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [selectedOperation, setSelectedOperation] = useState<Operation | null>(null);
+  const [selectedOperationForTracking, setSelectedOperationForTracking] = useState<Operation | null>(null);
 
   // New state for cancellation
   const [cancellationModalOpen, setCancellationModalOpen] = useState(false);
@@ -274,6 +278,12 @@ export default function ClientDashboard() {
     });
   };
 
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const handleMobileNavClick = (tab: any) => {
+    setActiveTab(tab);
+    setIsMenuOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -284,53 +294,145 @@ export default function ClientDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Tableau de Bord Client</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate max-w-[200px] md:max-w-none">Tableau de Bord Client</h1>
               {clientInfo?.sadicCode && (
-                <span className="ml-4 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-mono font-bold tracking-wider border border-blue-200">
+                <span className="hidden md:inline-block ml-4 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-mono font-bold tracking-wider border border-blue-200">
                   ID: {clientInfo.sadicCode}
                 </span>
               )}
             </div>
+
             <div className="flex items-center gap-4">
-              {user && (
-                <div className="flex items-center gap-3 mr-4">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500">{user.email}</p>
+              {/* Desktop User Actions */}
+              <div className="hidden md:flex items-center gap-4">
+                {user && (
+                  <div className="flex items-center gap-3 mr-4">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                      <p className="text-xs text-gray-500">{user.email}</p>
+                    </div>
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border border-gray-200 text-blue-600 font-bold">
+                      {user.avatar ? (
+                        <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span>{user.name?.charAt(0)}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden border border-gray-200 text-blue-600 font-bold">
+                )}
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className={`text-sm font-medium ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Mon Profil
+                </button>
+                <div>
+                  <button
+                    onClick={handleLogout}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                  >
+                    Déconnexion
+                  </button>
+                </div>
+              </div>
+
+              {/* Mobile Hamburger Button */}
+              <button
+                onClick={toggleMenu}
+                className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                {isMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Menu Dropdown */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-white border-b border-gray-100 shadow-lg absolute w-full z-30">
+            <div className="px-4 py-2 space-y-1">
+              {/* Mobile User Info */}
+              {user && (
+                <div className="flex items-center gap-3 py-3 border-b border-gray-100 mb-2">
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200 text-blue-700 font-bold">
                     {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
+                      <img src={user.avatar} alt={user.name} className="h-full w-full object-cover rounded-full" />
                     ) : (
                       <span>{user.name?.charAt(0)}</span>
                     )}
                   </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {clientInfo?.sadicCode ? `ID: ${clientInfo.sadicCode}` : user.email}
+                    </p>
+                  </div>
                 </div>
               )}
+
               <button
-                onClick={() => setActiveTab('profile')}
-                className={`text-sm font-medium ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={() => handleMobileNavClick('tableau')}
+                className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'tableau'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
               >
-                Mon Profil
+                📊 Tableau de Bord
               </button>
-              <div>
+              <button
+                onClick={() => handleMobileNavClick('operations')}
+                className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'operations'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+              >
+                🚚 Opérations
+                <span className="ml-2 bg-gray-100 text-gray-900 py-0.5 px-2 rounded-full text-xs">
+                  {stats?.operationsEnCours || 0}
+                </span>
+              </button>
+              <button
+                onClick={() => handleMobileNavClick('partenaires')}
+                className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'partenaires'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+              >
+                🤝 Partenaires
+              </button>
+
+              <div className="border-t border-gray-100 my-2 pt-2">
+                <button
+                  onClick={() => handleMobileNavClick('profile')}
+                  className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'profile'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                >
+                  Mon Profil
+                </button>
                 <button
                   onClick={handleLogout}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                  className="w-full text-left px-3 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
                 >
                   Déconnexion
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </header>
 
-      <div className="bg-white border-b">
+      {/* Main Navigation (Desktop) */}
+      <div className="bg-white border-b hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8">
             <button
@@ -610,15 +712,30 @@ export default function ClientDashboard() {
                                 Annuler
                               </button>
                             )}
-                            {['PENDING', 'EN_ATTENTE'].includes(operation.status) && (
-                              <button
-                                onClick={(e) => handleEditOperation(e, operation)}
-                                className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-200 transition-colors"
-                              >
-                                Modifier
-                              </button>
-                            )}
-                            <StatusBadge status={operation.status} />
+                            <div className="flex items-center space-x-3">
+                              {(operation.status === 'IN_PROGRESS' || operation.status === 'CONFIRMED' || operation.status === 'CONFIRME' || operation.status === 'EN_COURS') && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOperationForTracking(operation);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 p-2 rounded-full transition-colors"
+                                  title="Suivre l'opération"
+                                >
+                                  📍
+                                </button>
+                              )}
+                              {['PENDING', 'EN_ATTENTE'].includes(operation.status) && (
+                                <button
+                                  onClick={(e) => handleEditOperation(e, operation)}
+                                  className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-full transition-colors"
+                                  title="Modifier"
+                                >
+                                  ✏️
+                                </button>
+                              )}
+                              <StatusBadge status={operation.status} />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -775,8 +892,18 @@ export default function ClientDashboard() {
         }
       </main >
 
+      {/* Tracking Modal */}
+      {selectedOperationForTracking && (
+        <TrackingModal
+          isOpen={!!selectedOperationForTracking}
+          onClose={() => setSelectedOperationForTracking(null)}
+          operation={selectedOperationForTracking}
+        />
+      )}
+
       <OperationModal
         isOpen={isModalOpen}
+        initialData={operationToEdit}
         onClose={() => {
           setIsModalOpen(false);
           setOperationToEdit(null);
@@ -784,9 +911,10 @@ export default function ClientDashboard() {
         onSuccess={() => {
           console.log('✅ Demande traitée avec succès!');
           fetchData();
+          setIsModalOpen(false);
+          setOperationToEdit(null);
         }}
-        userRole="CLIENT"
-        initialData={operationToEdit}
+        userRole="CLIENT_ADMIN" // Adjust as needed
       />
 
       <CancellationModal
@@ -797,6 +925,7 @@ export default function ClientDashboard() {
         }}
         onConfirm={handleCancelOperation}
         loading={cancellationLoading}
+        operationRef={operationToCancel?.reference || ''}
       />
     </div >
   );

@@ -127,9 +127,14 @@ export async function DELETE(
             );
         }
 
-        await prisma.driver.delete({
-            where: { id }
-        });
+        if (existingDriver.userId) {
+            await prisma.$transaction([
+                prisma.driver.delete({ where: { id } }),
+                prisma.user.delete({ where: { id: existingDriver.userId } })
+            ]);
+        } else {
+            await prisma.driver.delete({ where: { id } });
+        }
 
         return NextResponse.json({ message: 'Chauffeur supprimé avec succès' });
     } catch (error) {

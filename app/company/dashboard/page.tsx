@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Menu, X } from 'lucide-react';
 import VehicleList from '../../../components/company/VehicleList';
 import DriverList from '../../../components/company/DriverList';
 import ClientList from '../../../components/company/ClientList';
@@ -13,6 +14,7 @@ import FinancialDashboard from '../../../components/company/FinancialDashboard';
 import CompanyProfile from '../../../components/company/CompanyProfile';
 import TeamList from '../../../components/company/TeamList';
 import PartnerList from '../../../components/company/PartnerList';
+import HumanResources from '../../../components/company/HumanResources';
 
 
 interface CompanyStats {
@@ -33,7 +35,7 @@ interface UserProfile {
   role: string;
 }
 
-type MainTab = 'overview' | 'planning' | 'finance' | 'resources' | 'profile';
+type MainTab = 'overview' | 'planning' | 'finance' | 'resources' | 'profile' | 'hr';
 type FinanceTab = 'invoices' | 'payments';
 type ResourceTab = 'fleet' | 'drivers' | 'subcontractors' | 'partners' | 'clients' | 'team';
 
@@ -47,6 +49,7 @@ export default function CompanyDashboard() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvoiceGenerator, setShowInvoiceGenerator] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -100,6 +103,12 @@ export default function CompanyDashboard() {
 
   const isAdmin = user?.role === 'COMPANY_ADMIN';
 
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const handleMobileNavClick = (tab: MainTab) => {
+    setActiveTab(tab);
+    setIsMenuOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -111,21 +120,22 @@ export default function CompanyDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Espace Transporteur</h1>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate max-w-[200px] md:max-w-none">Espace Transporteur</h1>
               {stats?.sadicCode && (
-                <span className="ml-4 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-mono font-bold tracking-wider border border-purple-200">
+                <span className="hidden md:inline-block ml-4 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-mono font-bold tracking-wider border border-purple-200">
                   ID: {stats.sadicCode}
                 </span>
               )}
             </div>
+
             <div className="flex items-center gap-4">
               {user && (
-                <div className="flex items-center gap-3 mr-4">
-                  <div className="text-right hidden sm:block">
+                <div className="hidden md:flex items-center gap-3 mr-4">
+                  <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">{user.name}</p>
                     <p className="text-xs text-gray-500">Administrateur</p>
                   </div>
@@ -138,25 +148,138 @@ export default function CompanyDashboard() {
                   </div>
                 </div>
               )}
+
+              <div className="hidden md:flex items-center gap-4">
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className={`text-sm font-medium ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Mon Profil
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
+                >
+                  Déconnexion
+                </button>
+              </div>
+
+              {/* Mobile Hamburger Button */}
               <button
-                onClick={() => setActiveTab('profile')}
-                className={`text-sm font-medium ${activeTab === 'profile' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                onClick={toggleMenu}
+                className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                Mon Profil
-              </button>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"
-              >
-                Déconnexion
+                {isMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
               </button>
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu Dropdown */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-white border-b border-gray-100 shadow-lg absolute w-full z-30">
+            <div className="px-4 py-2 space-y-1">
+              {/* Mobile User Info */}
+              {user && (
+                <div className="flex items-center gap-3 py-3 border-b border-gray-100 mb-2">
+                  <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200 text-blue-700 font-bold">
+                    {user.avatar ? (
+                      <img src={user.avatar} alt={user.name} className="h-full w-full object-cover rounded-full" />
+                    ) : (
+                      <span>{user.name?.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {stats?.sadicCode ? `ID: ${stats.sadicCode}` : 'Administrateur'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {isAdmin && (
+                <button
+                  onClick={() => handleMobileNavClick('overview')}
+                  className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'overview'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                >
+                  📊 Vue d'ensemble
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => handleMobileNavClick('hr')}
+                  className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'hr'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                >
+                  👥 RH & Paie
+                </button>
+              )}
+              <button
+                onClick={() => handleMobileNavClick('planning')}
+                className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'planning'
+                  ? 'bg-blue-50 text-blue-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+              >
+                🗓️ Planning & Opérations
+              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={() => handleMobileNavClick('finance')}
+                    className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'finance'
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                  >
+                    💰 Finance
+                  </button>
+                  <button
+                    onClick={() => handleMobileNavClick('resources')}
+                    className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'resources'
+                      ? 'bg-blue-50 text-blue-600'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                  >
+                    📦 Ressources
+                  </button>
+                </>
+              )}
+
+              <div className="border-t border-gray-100 my-2 pt-2">
+                <button
+                  onClick={() => handleMobileNavClick('profile')}
+                  className={`w-full text-left px-3 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'profile'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                >
+                  Mon Profil
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-3 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  Déconnexion
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* Main Navigation */}
-      <div className="bg-white border-b">
+      {/* Main Navigation (Desktop Only) */}
+      <div className="bg-white border-b hidden md:block">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-8 overflow-x-auto">
             {isAdmin && (
@@ -168,6 +291,17 @@ export default function CompanyDashboard() {
                   }`}
               >
                 📊 Vue d'ensemble
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('hr')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === 'hr'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+              >
+                👥 RH & Paie
               </button>
             )}
             <button
@@ -374,6 +508,8 @@ export default function CompanyDashboard() {
             onNameUpdate={(newName) => setUser(prev => prev ? { ...prev, name: newName } : null)}
           />
         )}
+
+        {activeTab === 'hr' && isAdmin && <HumanResources />}
       </main>
     </div>
   );

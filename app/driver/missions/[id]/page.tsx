@@ -4,22 +4,17 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Loader2, Navigation, CheckCircle2, Package, MapPin, Phone, FileText } from 'lucide-react';
+import { Loader2, Navigation, CheckCircle2, Package, MapPin, Phone, FileText, Truck, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MissionDocuments } from '@/components/driver/MissionDocuments';
 
-interface MissionDetail {
+interface TrackingUpdate {
     id: string;
+    note: string;
+    createdAt: string;
     status: string;
-    reference: string;
-    operationDate: string;
-    loadingPoints: any[];
-    unloadingPoints: any[];
-    client: { name: string; phone: string };
-    assignedVehicle: { plateNumber: string; brand: string };
 }
 
 export default function MissionDetailPage() {
@@ -28,238 +23,277 @@ export default function MissionDetailPage() {
     const { toast } = useToast();
     const [mission, setMission] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [gpsError, setGpsError] = useState<string | null>(null);
 
-    // Tracking State
-    const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
-    const [trackingNote, setTrackingNote] = useState('');
+    // Determines the current active step index
+    const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-    // Fetch mission details
+    // Workflow Steps Definition
+    const STEPS = [
+        { id: 'HEADING_TO_PICKUP', label: 'Je pars vers chargement', icon: Truck, statusReq: 'CONFIRMED' },
+        { id: 'ARRIVED_PICKUP', label: 'Je suis au chargement', icon: MapPin, statusReq: 'IN_PROGRESS' },
+        { id: 'GOODS_LOADED', label: 'Marchandise chargée', icon: Package, statusReq: 'IN_PROGRESS' },
+        { id: 'HEADING_TO_DELIVERY', label: 'Je pars vers livraison', icon: Truck, statusReq: 'IN_PROGRESS' },
+        { id: 'ARRIVED_DELIVERY', label: 'Je suis à la livraison', icon: MapPin, statusReq: 'IN_PROGRESS' },
+        { id: 'DELIVERED', label: 'Marchandise livrée', icon: CheckCircle2, statusReq: 'IN_PROGRESS' },
+    ];
+
     useEffect(() => {
-        async function fetchMission() {
-            try {
-                // Use the new specific endpoint
-                const res = await fetch(`/api/driver/missions/${params.id}`);
+        if (params.id) fetchMission();
+    }, [params.id]);
 
-                if (res.status === 404) {
-                    setError('Mission introuvable.');
-                    setLoading(false);
-                    return;
-                }
+    // Calculate current step based on tracking history
+    useEffect(() => {
+        if (mission && mission.trackingUpdates) {
+            const updates = mission.trackingUpdates.map((u: any) => u.note);
 
-                if (res.status === 403) {
-                    setError('Accès refusé.');
-                    setLoading(false);
-                    return;
-                }
+            // Logic to find the last completed step
+            let maxIndex = -1;
 
-                if (!res.ok) {
-                    throw new Error(`Erreur API: ${res.status}`);
-                }
-                const data = await res.json();
-                setMission(data);
+            // Analyze history to find where we are
+            // This is a heuristic based on the note content we set in the backend
+            // In a more robust system, we might store the 'step code' directly in DB
 
-            } catch (error) {
-                console.error(error);
-                setError('Erreur de chargement');
-            } finally {
-                setLoading(false);
+            if (updates.some((n: string) => n.includes('En route vers le point de chargement'))) maxIndex = 0;
+            if (updates.some((n: string) => n.includes('Arrivé au point de chargement'))) maxIndex = 1;
+            if (updates.some((n: string) => n.includes('Marchandise chargée'))) maxIndex = 2;
+            if (updates.some((n: string) => n.includes('En route vers le point de livraison'))) maxIndex = 3;
+            if (updates.some((n: string) => n.includes('Arrivé au point de livraison'))) maxIndex = 4;
+            if (mission.status === 'DELIVERED') maxIndex = 5;
+
+            // The NEXT step is maxIndex + 1
+            // If mission is confirmed but no tracking yet, we start at 0
+            if (mission.status === 'CONFIRMED' && maxIndex === -1) {
+                setCurrentStepIndex(0);
+            } else {
+                setCurrentStepIndex(maxIndex + 1);
             }
         }
-        if (params.id) fetchMission();
-    }, [params.id, router, toast]);
+    }, [mission]);
 
-    const handleAction = async (action: string, note?: string) => {
-        if (!mission) return;
-        setActionLoading(true);
+    async function fetchMission() {
         try {
-            const body: any = { action };
-            if (note) body.note = note;
+            const res = await fetch(`/api/driver/missions/${params.id}`);
+            if (!res.ok) throw new Error('Failed to load');
+            const data = await res.json();
+            setMission(data);
+        } catch (error) {
+            console.error(error);
+            toast({ title: 'Erreur', description: 'Impossible de charger la mission', variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    }
 
+    const getGPSLocation = (): Promise<{ lat: number; lng: number }> => {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error('Géolocalisation non supportée'));
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    resolve({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                },
+                (error) => {
+                    reject(error);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    };
+
+    const handleStepAction = async (stepId: string) => {
+        setActionLoading(true);
+        setGpsError(null);
+
+        try {
+            // 1. Get GPS
+            let location = { lat: 0, lng: 0 };
+            try {
+                location = await getGPSLocation();
+            } catch (gpsErr) {
+                console.warn('GPS failed', gpsErr);
+                setGpsError('Impossible de récupérer votre position. Veuillez activer le GPS.');
+                // We might allow proceeding without GPS if critical, but for now let's warn
+                // Uncomment to block: 
+                // setActionLoading(false); return; 
+            }
+
+            // 2. Send Update
             const res = await fetch(`/api/driver/missions/${mission.id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify({
+                    step: stepId,
+                    lat: location.lat,
+                    lng: location.lng
+                })
             });
 
-            if (!res.ok) throw new Error('Action failed');
+            if (!res.ok) throw new Error('Update failed');
 
-            // Refetch to see update
-            const updatedRes = await fetch(`/api/driver/missions/${mission.id}`);
-            const updatedData = await updatedRes.json();
-            setMission(updatedData);
-
-            toast({ title: 'Mise à jour effectuée !' });
-            setIsTrackingModalOpen(false);
-            setTrackingNote('');
+            toast({ title: 'Statut mis à jour !' });
+            fetchMission(); // Refresh data
 
         } catch (error) {
-            toast({ title: 'Erreur', description: 'Impossible de mettre à jour le statut', variant: 'destructive' });
+            console.error(error);
+            toast({ title: 'Erreur', description: 'Une erreur est survenue', variant: 'destructive' });
         } finally {
             setActionLoading(false);
         }
     };
 
-    if (loading) return <div className="p-8 flex justify-center"><Loader2 className="animate-spin" /></div>;
-    if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
+    if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-blue-600" /></div>;
     if (!mission) return <div className="p-8 text-center">Mission introuvable</div>;
 
-    // Determine Main Action Button based on status
-    let mainAction = null;
-    switch (mission.status) {
-        case 'PENDING':
-            mainAction = (
-                <div className="flex gap-2">
-                    <Button className="flex-1 bg-red-100 text-red-700 hover:bg-red-200" onClick={() => handleAction('REJECT')} disabled={actionLoading}>
-                        Refuser
-                    </Button>
-                    <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => handleAction('ACCEPT')} disabled={actionLoading}>
-                        Accepter
-                    </Button>
-                </div>
-            );
-            break;
-        case 'CONFIRMED':
-            mainAction = (
-                <Button className="w-full bg-blue-600 h-12 text-lg" onClick={() => handleAction('START')} disabled={actionLoading}>
-                    <Navigation className="mr-2" /> Démarrer la mission
-                </Button>
-            );
-            break;
-        case 'IN_PROGRESS':
-            mainAction = (
-                <div className="space-y-2">
-                    <Button variant="secondary" className="w-full border" onClick={() => setIsTrackingModalOpen(true)}>
-                        💬 Ajouter une note
-                    </Button>
-                    <Button className="w-full bg-green-600 h-12 text-lg" onClick={() => handleAction('DELIVERED')} disabled={actionLoading}>
-                        <CheckCircle2 className="mr-2" /> Confirmer Livraison
-                    </Button>
-                </div>
-            );
-            break;
-        case 'DELIVERED':
-            mainAction = <div className="text-center text-green-600 font-bold p-4 border border-green-200 rounded-lg bg-green-50">Mission Terminée</div>;
-            break;
-    }
+    const isMissionActive = ['CONFIRMED', 'IN_PROGRESS'].includes(mission.status);
+    const isMissionCompleted = ['DELIVERED', 'COMPLETED'].includes(mission.status);
 
     return (
-        <div className="p-4 pb-24 space-y-6">
+        <div className="p-4 pb-24 space-y-6 max-w-lg mx-auto">
             {/* Header */}
-            <div className="flex justify-between items-center">
-                <Button variant="ghost" onClick={() => router.back()}>&larr; Retour</Button>
+            <div className="flex items-center justify-between">
+                <Button variant="ghost" size="sm" onClick={() => router.back()}>
+                    &larr; Retour
+                </Button>
                 <div className="text-right">
-                    <span className="font-mono text-sm block text-gray-500">#{mission.reference}</span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100">{mission.status}</span>
+                    <div className="font-bold text-gray-900">Mission #{mission.reference}</div>
+                    <div className={`text-xs font-semibold px-2 py-0.5 rounded-full inline-block ${mission.status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                        {mission.status}
+                    </div>
                 </div>
             </div>
 
-            {/* Status & Action */}
-            <div className="sticky top-16 z-10 bg-white/95 backdrop-blur shadow-sm p-4 rounded-xl border border-gray-100">
-                <p className="text-sm text-gray-500 mb-2 text-center uppercase tracking-wider">actions</p>
-                {mainAction}
-            </div>
+            {/* ERROR GPS ALERT */}
+            {gpsError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    <strong className="font-bold">Attention!</strong>
+                    <span className="block sm:inline"> {gpsError}</span>
+                </div>
+            )}
 
-            {/* Modal Add Note */}
-            {isTrackingModalOpen && (
-                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-                        <h3 className="text-lg font-medium mb-4">Ajouter une note</h3>
-                        <textarea
-                            className="w-full border rounded-md p-2 mb-4"
-                            rows={3}
-                            placeholder="Ex: Pause déjeuner, Trafic dense..."
-                            value={trackingNote}
-                            onChange={(e) => setTrackingNote(e.target.value)}
-                        />
-                        <div className="flex justify-end gap-2">
-                            <Button variant="ghost" onClick={() => setIsTrackingModalOpen(false)}>Annuler</Button>
-                            <Button onClick={() => handleAction('UPDATE', trackingNote)}>Envoyer</Button>
+            {/* CURRENT ACTION CARD */}
+            {isMissionActive && currentStepIndex < STEPS.length && (
+                <div className="bg-white rounded-xl shadow-lg border-2 border-blue-100 overflow-hidden">
+                    <div className="bg-blue-50 p-4 border-b border-blue-100">
+                        <h2 className="text-lg font-bold text-blue-900 flex items-center">
+                            <Navigation className="mr-2 h-5 w-5" /> Action Requise
+                        </h2>
+                        <p className="text-sm text-blue-700">Étape {currentStepIndex + 1} sur {STEPS.length}</p>
+                    </div>
+                    <div className="p-6">
+                        <div className="mb-6 text-center">
+                            <p className="text-gray-500 mb-2">Prochaine étape :</p>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                                {STEPS[currentStepIndex].label}
+                            </h3>
                         </div>
+
+                        <Button
+                            className="w-full h-16 text-lg font-bold shadow-md bg-blue-600 hover:bg-blue-700 transition-all transform hover:scale-[1.02]"
+                            onClick={() => handleStepAction(STEPS[currentStepIndex].id)}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? (
+                                <Loader2 className="animate-spin mr-2 h-6 w-6" />
+                            ) : (
+                                <div className="flex items-center justify-center">
+                                    <span className="mr-2">Confirmer</span>
+                                    <ArrowRight className="h-6 w-6" />
+                                </div>
+                            )}
+                        </Button>
+                        <p className="text-xs text-center text-gray-400 mt-3">
+                            📍 Votre position GPS sera enregistrée
+                        </p>
                     </div>
                 </div>
             )}
 
-            {/* Route Info */}
+            {isMissionCompleted && (
+                <div className="bg-green-50 rounded-xl p-6 text-center border border-green-200">
+                    <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-3" />
+                    <h2 className="text-xl font-bold text-green-900">Mission Terminée !</h2>
+                    <p className="text-green-700">Merci pour votre bon travail.</p>
+                </div>
+            )}
+
+            {/* TIMELINE PREVIEW */}
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Progression</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {STEPS.map((step, index) => {
+                            const isCompleted = index < currentStepIndex || isMissionCompleted;
+                            const isCurrent = index === currentStepIndex && !isMissionCompleted;
+                            const Icon = step.icon;
+
+                            return (
+                                <div key={step.id} className={`flex items-center ${isCompleted ? 'text-blue-600' : isCurrent ? 'text-gray-900' : 'text-gray-300'}`}>
+                                    <div className={`
+                                        flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center border-2 mr-3
+                                        ${isCompleted ? 'bg-blue-50 border-blue-600' : isCurrent ? 'bg-white border-blue-600 ring-2 ring-blue-100' : 'bg-gray-50 border-gray-200'}
+                                    `}>
+                                        {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-4 w-4" />}
+                                    </div>
+                                    <span className={`font-medium ${isCurrent ? 'font-bold' : ''}`}>{step.label}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* MISSION INFO */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center text-lg">
-                        <MapPin className="mr-2 h-5 w-5 text-blue-600" /> Itinéraire
+                        <MapPin className="mr-2 h-5 w-5 text-gray-500" /> Détails Mission
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="relative pl-6 border-l-2 border-dashed border-gray-200">
-                        <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-blue-500 ring-4 ring-white" />
-                        <div>
-                            <h3 className="font-semibold text-gray-900">Chargement</h3>
-                            <p className="text-gray-600">{mission.loadingPoints[0]?.address}</p>
-                            <p className="text-sm text-gray-400 mt-1">
-                                {mission.operationDate && format(new Date(mission.operationDate), 'dd MMM, HH:mm', { locale: fr })}
-                            </p>
-                        </div>
+                <CardContent className="space-y-4">
+                    <div className="border-l-2 border-blue-500 pl-4 py-1">
+                        <label className="text-xs text-gray-500 uppercase font-bold">Chargement</label>
+                        <p className="font-medium">{mission.loadingPoints[0]?.address}</p>
+                        <p className="text-sm text-gray-500">
+                            {mission.operationDate && format(new Date(mission.operationDate), 'dd MMM, HH:mm', { locale: fr })}
+                        </p>
                     </div>
-
-                    <div className="relative pl-6 border-l-2 border-transparent">
-                        <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-red-500 ring-4 ring-white" />
-                        <div>
-                            <h3 className="font-semibold text-gray-900">Livraison</h3>
-                            <p className="text-gray-600">{mission.unloadingPoints[0]?.address}</p>
-                        </div>
+                    <div className="border-l-2 border-green-500 pl-4 py-1">
+                        <label className="text-xs text-gray-500 uppercase font-bold">Livraison</label>
+                        <p className="font-medium">{mission.unloadingPoints[0]?.address}</p>
                     </div>
+                    {mission.client && (
+                        <div className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+                            <div>
+                                <p className="font-medium text-sm">{mission.client.name}</p>
+                                <p className="text-xs text-gray-500">Client</p>
+                            </div>
+                            {mission.client.phone && (
+                                <a href={`tel:${mission.client.phone}`}>
+                                    <Button size="icon" variant="outline" className="h-8 w-8 rounded-full">
+                                        <Phone className="h-4 w-4" />
+                                    </Button>
+                                </a>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
-            {/* Tracking History */}
-            {mission.trackingUpdates && mission.trackingUpdates.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center text-lg">
-                            <Navigation className="mr-2 h-5 w-5 text-purple-600" /> Suivi
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ul className="space-y-4">
-                            {mission.trackingUpdates.map((update: any) => (
-                                <li key={update.id} className="relative pl-4 border-l-2 border-gray-200 py-1">
-                                    <div className="absolute -left-[5px] top-2 h-2 w-2 rounded-full bg-gray-400 ring-2 ring-white" />
-                                    <div className="text-sm font-medium">{update.note}</div>
-                                    <div className="text-xs text-gray-500">
-                                        {format(new Date(update.createdAt), 'HH:mm - dd/MM', { locale: fr })}
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Client Info */}
+            {/* DOCUMENTS */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg flex items-center">
-                        <Package className="mr-2 h-5 w-5 text-orange-500" /> Détails Client
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="font-medium">{mission.client?.name || 'Client Inconnu'}</p>
-                        </div>
-                        {mission.client?.phone && (
-                            <a href={`tel:${mission.client.phone}`}>
-                                <Button size="sm" variant="outline"><Phone className="h-4 w-4" /></Button>
-                            </a>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Documents */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center">
-                        <FileText className="mr-2 h-5 w-5 text-gray-500" /> Documents
+                    <CardTitle className="flex items-center text-lg">
+                        <FileText className="mr-2 h-5 w-5 text-gray-500" /> Documents & Preuves
                     </CardTitle>
                 </CardHeader>
                 <CardContent>

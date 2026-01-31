@@ -1,154 +1,119 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyAuth } from '@/lib/auth';
-import { OperationStatus, DriverAssignmentStatus } from '@prisma/client';
 
-// PATCH - Update mission status by driver
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: { id: string } }
 ) {
     try {
-        const authUser = verifyAuth(request);
-
-        if (!authUser) {
+        const userPayload = verifyAuth(request);
+        if (!userPayload) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (authUser.role !== 'INDEPENDENT_DRIVER' && authUser.role !== 'EMPLOYED_DRIVER') {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-
-        const { id: operationId } = await params;
-
+        const missionId = params.id;
         const body = await request.json();
-        const { action, location } = body;
-        // action: 'ACCEPT', 'REJECT', 'START', 'ARRIVED_LOADING', 'LOADED', 'ARRIVED_UNLOADING', 'DELIVERED'
+        const { step, note, lat, lng } = body;
 
+        // Verify driver owns this mission
         const driver = await prisma.driver.findUnique({
-            where: { userId: authUser.userId },
+            where: { userId: userPayload.userId },
         });
 
         if (!driver) {
-            return NextResponse.json({ error: 'Driver profile not found' }, { status: 404 });
+            return NextResponse.json({ error: 'Driver not found' }, { status: 404 });
         }
 
-        const operation = await prisma.operation.findUnique({
-            where: { id: operationId },
-            include: {
-                assignedDrivers: {
-                    where: { driverId: driver.id }
-                }
+        const operation = await prisma.operation.findFirst({
+            where: {
+                id: missionId,
+                OR: [
+                    { assignedDriverId: driver.id },
+                    { assignedDrivers: { some: { driverId: driver.id } } }
+                ]
             }
         });
 
         if (!operation) {
-            return NextResponse.json({ error: 'Operation not found' }, { status: 404 });
+            return NextResponse.json({ error: 'Mission not found or unauthorized' }, { status: 403 });
         }
 
-        // Verify assignment
-        const isDirectlyAssigned = operation.assignedDriverId === driver.id;
-        const assignmentRecord = operation.assignedDrivers[0];
+        // Logic for each step to update Operation Status and create TrackingUpdate
+        let newOperationStatus = undefined;
+        let trackingNote = note || '';
 
-        if (!isDirectlyAssigned && !assignmentRecord) {
-            return NextResponse.json({ error: 'Not assigned to this operation' }, { status: 403 });
-        }
-
-        // State Machine Logic
-        let updateData: any = {};
-        let assignmentUpdateData: any = {};
-
-        switch (action) {
-            case 'ACCEPT':
-                if (assignmentRecord) {
-                    assignmentUpdateData.status = 'CONFIRME';
-                }
-                if (operation.status === 'PENDING') {
-                    updateData.status = 'CONFIRMED'; // Or keep it pending until admin confirms?
-                    // Let's assume Driver accept -> Confirmed for now if simplified
-                }
+        switch (step) {
+            case 'HEADING_TO_PICKUP':
+                newOperationStatus = 'IN_PROGRESS';
+                trackingNote = '🚚 En route vers le point de chargement';
                 break;
-
-            case 'REJECT':
-                if (assignmentRecord) {
-                    assignmentUpdateData.status = 'ANNULE'; // Or REJETE if enum existed
-                }
-                // Remove direct assignment if any?
-                if (isDirectlyAssigned) {
-                    updateData.assignedDriverId = null;
-                }
+            case 'ARRIVED_PICKUP':
+                trackingNote = '📍 Arrivé au point de chargement';
                 break;
-
-            case 'START':
-                updateData.status = 'IN_PROGRESS';
-                updateData.startedAt = new Date();
-                if (assignmentRecord) {
-                    assignmentUpdateData.status = 'EN_COURS';
-                }
+            case 'GOODS_LOADED':
+                trackingNote = '📦 Marchandise chargée';
                 break;
-
-            case 'ARRIVED_LOADING':
-                // Log this in tracking updates?
+            case 'HEADING_TO_DELIVERY':
+                trackingNote = '🚚 En route vers le point de livraison';
                 break;
-
-            case 'LOADED':
-                // Maybe status stays IN_PROGRESS but we note it?
-                // Or if we had granular status. For now, just tracking update.
+            case 'ARRIVED_DELIVERY':
+                trackingNote = '📍 Arrivé au point de livraison';
                 break;
-
             case 'DELIVERED':
-                updateData.status = 'DELIVERED';
-                updateData.deliveredAt = new Date();
-                if (assignmentRecord) {
-                    assignmentUpdateData.status = 'TERMINE';
-                }
+                newOperationStatus = 'DELIVERED';
+                trackingNote = '✅ Marchandise livrée - Mission terminée';
                 break;
-
-            case 'UPDATE':
-                // Just a tracking update, no status change
-                break;
-
             default:
-                return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+                // Generic update
+                break;
         }
 
-        // Transaction to update op, assignment, and tracking
-        await prisma.$transaction(async (tx) => {
-            if (Object.keys(updateData).length > 0) {
-                await tx.operation.update({
-                    where: { id: operationId },
-                    data: updateData
-                });
-            }
+        // 1. Update Operation Status if it changes
+        if (newOperationStatus) {
+            await prisma.operation.update({
+                where: { id: missionId },
+                data: {
+                    status: newOperationStatus as any,
+                    // Update timestamps if relevant
+                    startedAt: newOperationStatus === 'IN_PROGRESS' && !operation.startedAt ? new Date() : undefined,
+                    deliveredAt: newOperationStatus === 'DELIVERED' ? new Date() : undefined
+                }
+            });
+        }
 
-            if (assignmentRecord && Object.keys(assignmentUpdateData).length > 0) {
-                await tx.driverAssignment.update({
-                    where: { id: assignmentRecord.id },
-                    data: assignmentUpdateData
-                });
-            }
+        // 2. Create Tracking Update
+        const locationJson = (lat && lng) ? { lat, lng } : undefined;
 
-            // Add Tracking Update
-            if (location || action) {
-                await tx.trackingUpdate.create({
-                    data: {
-                        operationId: operationId,
-                        status: updateData.status || operation.status,
-                        note: action === 'UPDATE' ? (body.note || 'Mise à jour') : `Driver Action: ${action}`,
-                        location: location || null,
-                        recordedBy: driver.name
-                    }
-                });
+        await prisma.trackingUpdate.create({
+            data: {
+                operationId: missionId,
+                status: (newOperationStatus || operation.status) as any,
+                note: trackingNote,
+                location: locationJson as any,
+                recordedBy: userPayload.name || 'Chauffeur'
             }
         });
 
-        return NextResponse.json({ success: true });
+        // 3. Update Current Location on Operation (for real-time map)
+        if (locationJson) {
+            await prisma.operation.update({
+                where: { id: missionId },
+                data: {
+                    currentLocation: {
+                        lat,
+                        lng,
+                        address: 'En mouvement', // Could inverse geocode if needed
+                        timestamp: new Date().toISOString()
+                    }
+                }
+            });
+        }
 
-    } catch (error: any) {
+        return NextResponse.json({ success: true, status: newOperationStatus });
+
+    } catch (error) {
         console.error('Error updating mission status:', error);
-        return NextResponse.json(
-            { error: 'Internal Server Error' },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

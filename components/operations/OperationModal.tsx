@@ -667,7 +667,10 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
                       >
                         <option value="">Sélectionner un sous-traitant</option>
                         {subcontractors.map(sub => (
-                          <option key={sub.id} value={sub.id}>{sub.companyName || sub.name}</option>
+                          <option key={sub.id} value={sub.id}>
+                            {sub.companyName || sub.name}
+                            {sub.drivers?.some((d: any) => d.isIndependent) ? ' (Indépendant)' : ''}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -692,6 +695,7 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
 
                     {formData.subcontractorId && (
                       <>
+                        {/* Auto-select driver if only one exists (common for independent) */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Conducteur (Sous-traitant)
@@ -705,9 +709,14 @@ export default function OperationModal({ isOpen, onClose, onSuccess, userRole, i
                             {drivers
                               .filter(d => d.subcontractorId === formData.subcontractorId)
                               .map(driver => (
-                                <option key={driver.id} value={driver.id}>{driver.name}</option>
+                                <option key={driver.id} value={driver.id}>
+                                  {driver.name} {driver.isIndependent ? '(Indépendant)' : ''}
+                                </option>
                               ))}
                           </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Pour un chauffeur indépendant, sélectionnez-le ici pour qu'il reçoive la mission sur son app.
+                          </p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">

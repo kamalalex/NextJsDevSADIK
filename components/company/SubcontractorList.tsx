@@ -32,7 +32,8 @@ export default function SubcontractorList() {
         email: '',
         address: '',
         companyId: '',
-        paymentWithInvoice: true
+        paymentWithInvoice: true,
+        isIndependent: false
     });
 
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -138,7 +139,8 @@ export default function SubcontractorList() {
             email: '',
             address: '',
             companyId: '',
-            paymentWithInvoice: true
+            paymentWithInvoice: true,
+            isIndependent: false
         });
         setEditingId(null);
     };
@@ -226,6 +228,11 @@ export default function SubcontractorList() {
                                         {sub.sadicCode && (
                                             <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-wider border border-blue-100">
                                                 {sub.sadicCode}
+                                            </span>
+                                        )}
+                                        {sub.drivers && sub.drivers.some((d: any) => d.isIndependent) && (
+                                            <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wider border border-purple-200">
+                                                Indépendant
                                             </span>
                                         )}
                                         {sub.paymentWithInvoice ? (
@@ -324,6 +331,25 @@ export default function SubcontractorList() {
                         <div className="bg-white rounded-lg p-6 max-w-md w-full">
                             <h3 className="text-lg font-medium mb-4">{editingId ? 'Modifier le sous-traitant' : 'Ajouter un sous-traitant'}</h3>
                             <form onSubmit={handleSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Type de partenaire</label>
+                                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, isIndependent: false })}
+                                            className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${!formData.isIndependent ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                        >
+                                            Entreprise de Transport
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, isIndependent: true })}
+                                            className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${formData.isIndependent ? 'bg-white shadow text-purple-600' : 'text-gray-500 hover:text-gray-700'}`}
+                                        >
+                                            Chauffeur Indépendant
+                                        </button>
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Nom de la société</label>
                                     <input

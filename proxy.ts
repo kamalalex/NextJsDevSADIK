@@ -9,7 +9,7 @@ const roleRoutes = {
   '/admin': ['SUPER_ADMIN', 'SUPER_ASSISTANT', 'SUPER_COMMERCIAL', 'SUPER_FINANCE'],
   '/company': ['COMPANY_ADMIN', 'COMPANY_OPERATOR'],
   '/client': ['CLIENT_ADMIN', 'CLIENT_LOGISTICS'],
-  '/driver': ['INDEPENDENT_DRIVER'],
+  '/driver': ['INDEPENDENT_DRIVER', 'EMPLOYED_DRIVER'],
 };
 
 export function proxy(request: NextRequest) {
@@ -59,8 +59,12 @@ export function proxy(request: NextRequest) {
     // Vérifier les permissions basées sur le rôle
     for (const [route, allowedRoles] of Object.entries(roleRoutes)) {
       if (pathname.startsWith(route)) {
-        if (!allowedRoles.includes(decoded.role)) {
-          console.log('🚫 Accès refusé pour le rôle:', decoded.role, 'sur la route:', route);
+        // DEBUG LOGGING
+        console.log(`🔍 DEBUG CHECK: Route=${route}, UserRole='${decoded.role}', Allowed=${JSON.stringify(allowedRoles)}`);
+        const userRole = decoded.role?.trim();
+
+        if (!allowedRoles.includes(userRole)) {
+          console.log('🚫 Accès refusé pour le rôle:', userRole, 'sur la route:', route);
           return NextResponse.redirect(new URL('/unauthorized', request.url));
         }
         break;
@@ -93,6 +97,7 @@ function getDashboardUrl(role: string): string {
     case 'CLIENT_LOGISTICS':
       return '/client/dashboard';
     case 'INDEPENDENT_DRIVER':
+    case 'EMPLOYED_DRIVER':
       return '/driver/dashboard';
     default:
       console.warn('⚠️ Rôle inconnu, redirection vers admin par défaut');

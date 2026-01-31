@@ -17,26 +17,70 @@ export async function POST(request: NextRequest) {
             email,
             address,
             companyId: subcontractorCompanyId, // RC/IF
-            paymentWithInvoice
+            paymentWithInvoice,
+            isIndependent // New flag
         } = body;
 
         const sadicCode = `SUB-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)}`;
 
-        const subcontractor = await prisma.subcontractor.create({
-            data: {
-                name,
-                companyName,
-                phone,
-                email,
-                address,
-                companyId: subcontractorCompanyId,
-                paymentWithInvoice,
-                transportCompanyId: user.companyId,
-                sadicCode
+        // Transaction to ensure both records are created or neither
+        const result = await prisma.$transaction(async (tx) => {
+            const subcontractor = await tx.subcontractor.create({
+                data: {
+                    name,
+                    companyName,
+                    phone,
+                    email,
+                    address,
+                    companyId: subcontractorCompanyId,
+                    paymentWithInvoice,
+                    transportCompanyId: user.companyId,
+                    sadicCode
+                }
+            });
+
+            // If Independent, create a Driver account linked to this subcontractor
+            if (isIndependent) {
+                // Check if user already exists
+                let existingUser = null;
+                if (email) {
+                    existingUser = await tx.user.findUnique({ where: { email } });
+                }
+
+                let userId = existingUser?.id;
+
+                if (!existingUser && email) {
+                    const hashedPassword = await import('bcryptjs').then(bcrypt => bcrypt.hash('123456', 10)); // Default password
+                    const newUser = await tx.user.create({
+                        data: {
+                            email,
+                            password: hashedPassword,
+                            name: name || companyName,
+                            role: 'INDEPENDENT_DRIVER',
+                            phone: phone
+                        }
+                    });
+                    userId = newUser.id;
+                }
+
+                await tx.driver.create({
+                    data: {
+                        name: name || companyName,
+                        phone: phone,
+                        email: email,
+                        license: 'PENDING', // Placeholder
+                        status: 'ACTIVE',
+                        isIndependent: true,
+                        subcontractorId: subcontractor.id,
+                        userId: userId
+                    }
+                });
             }
+
+            return subcontractor;
         });
 
-        return NextResponse.json(subcontractor);
+        return NextResponse.json(result);
     } catch (error) {
         console.error('Error creating subcontractor:', error);
         return NextResponse.json(
