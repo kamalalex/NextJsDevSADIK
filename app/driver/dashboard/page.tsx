@@ -152,7 +152,7 @@ export default function DriverDashboard() {
                 </div>
 
                 {/* Top Clients List - HIDDEN FOR INTERNAL DRIVERS */}
-                {!stats.isInternal && (
+                {stats && !stats.isInternal && (
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                         <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
                             <Users className="text-purple-600" size={20} />
