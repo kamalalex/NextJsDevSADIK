@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { Suspense } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, MapPin, ChevronRight, Loader2, Package, Truck, Clock } from 'lucide-react';
 import { format } from 'date-fns';
@@ -20,6 +21,14 @@ interface Mission {
 }
 
 export default function MissionsPage() {
+    return (
+        <Suspense fallback={<div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
+            <MissionsContent />
+        </Suspense>
+    );
+}
+
+function MissionsContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const statusParam = searchParams.get('status') || 'CURRENT'; // Default to CURRENT
@@ -77,8 +86,8 @@ export default function MissionsPage() {
                     <button
                         onClick={() => router.push('/driver/missions?status=CURRENT')}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${statusParam === 'CURRENT'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
                             }`}
                     >
                         En Cours
@@ -86,8 +95,8 @@ export default function MissionsPage() {
                     <button
                         onClick={() => router.push('/driver/missions?status=COMPLETED')}
                         className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${statusParam === 'COMPLETED'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
                             }`}
                     >
                         Terminées

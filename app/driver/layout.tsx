@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Truck, LayoutDashboard, ClipboardList, CheckSquare, User, LogOut, Menu, X, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 export default function DriverLayout({
     children,
@@ -11,7 +12,6 @@ export default function DriverLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
-    const searchParams = useSearchParams();
     const [user, setUser] = useState<any>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -160,53 +160,9 @@ export default function DriverLayout({
             {/* Desktop Navigation */}
             <div className="bg-white border-b hidden md:block">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <nav className="flex space-x-8">
-                        {navItems.map((item) => {
-                            const [itemPath, itemQuery] = item.href.split('?');
-                            const isPathMatch = pathname === itemPath;
-
-                            // Check query params if they exist in the item href
-                            let isQueryMatch = true;
-                            if (itemQuery) {
-                                const currentStatus = searchParams.get('status');
-                                const itemStatus = new URLSearchParams(itemQuery).get('status');
-                                isQueryMatch = currentStatus === itemStatus;
-
-                                // Default to CURRENT if no status param is present and we're on the missions page
-                                if (!currentStatus && itemPath === '/driver/missions' && itemStatus === 'CURRENT') {
-                                    isQueryMatch = true;
-                                } else if (!currentStatus && itemPath === '/driver/missions' && itemStatus !== 'CURRENT') {
-                                    isQueryMatch = false;
-                                }
-                            }
-
-                            const isActive = isPathMatch && isQueryMatch;
-
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${isActive
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                >
-                                    {item.icon}
-                                    {item.label}
-                                </Link>
-                            )
-                        })}
-                        <Link
-                            href="/driver/profile"
-                            className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${pathname === '/driver/profile'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                        >
-                            <User size={20} />
-                            Mon Profil
-                        </Link>
-                    </nav>
+                    <Suspense fallback={<div className="h-14" />}>
+                        <DesktopNav pathname={pathname} navItems={navItems} />
+                    </Suspense>
                 </div>
             </div>
 
@@ -217,5 +173,59 @@ export default function DriverLayout({
                 </div>
             </main>
         </div>
+    );
+}
+
+function DesktopNav({ pathname, navItems }: { pathname: string, navItems: any[] }) {
+    const searchParams = useSearchParams();
+
+    return (
+        <nav className="flex space-x-8">
+            {navItems.map((item) => {
+                const [itemPath, itemQuery] = item.href.split('?');
+                const isPathMatch = pathname === itemPath;
+
+                // Check query params if they exist in the item href
+                let isQueryMatch = true;
+                if (itemQuery) {
+                    const currentStatus = searchParams.get('status');
+                    const itemStatus = new URLSearchParams(itemQuery).get('status');
+                    isQueryMatch = currentStatus === itemStatus;
+
+                    // Default to CURRENT if no status param is present and we're on the missions page
+                    if (!currentStatus && itemPath === '/driver/missions' && itemStatus === 'CURRENT') {
+                        isQueryMatch = true;
+                    } else if (!currentStatus && itemPath === '/driver/missions' && itemStatus !== 'CURRENT') {
+                        isQueryMatch = false;
+                    }
+                }
+
+                const isActive = isPathMatch && isQueryMatch;
+
+                return (
+                    <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${isActive
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                            }`}
+                    >
+                        {item.icon}
+                        {item.label}
+                    </Link>
+                )
+            })}
+            <Link
+                href="/driver/profile"
+                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${pathname === '/driver/profile'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+            >
+                <User size={20} />
+                Mon Profil
+            </Link>
+        </nav>
     );
 }
