@@ -4,7 +4,7 @@ import { verifyAuth } from '@/lib/auth';
 
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const userPayload = verifyAuth(request);
@@ -12,7 +12,8 @@ export async function PATCH(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const missionId = params.id;
+        const { id } = await params;
+        const missionId = id;
         const body = await request.json();
         const { step, note, lat, lng } = body;
 
