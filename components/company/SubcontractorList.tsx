@@ -103,10 +103,11 @@ export default function SubcontractorList() {
             name: sub.name,
             companyName: sub.companyName,
             phone: sub.phone,
-            email: sub.email,
-            address: sub.address,
-            companyId: sub.companyId,
-            paymentWithInvoice: sub.paymentWithInvoice
+            email: sub.email || '',
+            address: sub.address || '',
+            companyId: sub.companyId || '',
+            paymentWithInvoice: sub.paymentWithInvoice,
+            isIndependent: (sub as any).drivers?.some((d: any) => d.isIndependent) || false
         });
         setEditingId(sub.id);
         setIsModalOpen(true);

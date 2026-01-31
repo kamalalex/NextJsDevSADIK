@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Request, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Receipt, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Expense {

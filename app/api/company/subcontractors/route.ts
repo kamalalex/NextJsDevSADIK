@@ -30,11 +30,11 @@ export async function POST(request: NextRequest) {
                     name,
                     companyName,
                     phone,
-                    email,
-                    address,
-                    companyId: subcontractorCompanyId,
-                    paymentWithInvoice,
-                    transportCompanyId: user.companyId,
+                    email: email || null,
+                    address: address || null,
+                    companyId: subcontractorCompanyId || null,
+                    paymentWithInvoice: !!paymentWithInvoice,
+                    transportCompanyId: user.companyId!,
                     sadicCode
                 }
             });

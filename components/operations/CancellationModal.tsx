@@ -7,9 +7,10 @@ interface CancellationModalProps {
     onClose: () => void;
     onConfirm: (reason: string) => Promise<void>;
     loading: boolean;
+    operationRef?: string;
 }
 
-export default function CancellationModal({ isOpen, onClose, onConfirm, loading }: CancellationModalProps) {
+export default function CancellationModal({ isOpen, onClose, onConfirm, loading, operationRef }: CancellationModalProps) {
     const [reason, setReason] = useState('');
     const [error, setError] = useState('');
 
