@@ -4,7 +4,7 @@ import { verifyAuth } from '@/lib/auth';
 
 export async function PATCH(
     request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     try {
         const userPayload = verifyAuth(request);

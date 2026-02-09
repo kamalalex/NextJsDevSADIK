@@ -5,7 +5,7 @@ import { verifyAuth } from '@/lib/auth';
 // GET - Fetch single mission details for the logged-in driver including tracking history
 export async function GET(
     request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
     try {
         const authUser = verifyAuth(request);
